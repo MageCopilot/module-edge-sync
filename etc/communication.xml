@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Communication/etc/communication.xsd">
+    <topic name="magecopilot.inventory.stock_update" is_synchronous="false" request="string">
+        <handler name="magecopilot_typesense_stock_sync_handler" type="MageCopilot\EdgeSync\Model\Queue\Consumer" method="processMessage" />
+    </topic>
+    <topic name="magecopilot.edgesync.product" is_synchronous="false" request="string">
+        <handler name="magecopilot_typesense_product_sync_handler" type="MageCopilot\EdgeSync\Model\Queue\Consumer" method="processProductMessage" />
+    </topic>
+</config>

@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework-message-queue:etc/publisher.xsd">
+    <publisher topic="magecopilot.inventory.stock_update" queue="magecopilot_typesense_stock_sync"/>
+    <publisher topic="magecopilot.edgesync.product" queue="magecopilot_typesense_product_sync"/>
+</config>

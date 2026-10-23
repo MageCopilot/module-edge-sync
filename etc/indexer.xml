@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Indexer/etc/indexer.xsd">
+    <indexer id="typesense_products" view_id="typesense_products" class="MageCopilot\EdgeSync\Model\Indexer\ProductIndexer">
+        <title translate="true">MageCopilot Typesense Products Indexer</title>
+        <description translate="true">Synchronizes catalog products to Typesense edge memory cluster</description>
+    </indexer>
+</config>

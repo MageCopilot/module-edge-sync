@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework-message-queue:etc/consumer.xsd">
+    <consumer name="magecopilot_typesense_stock_sync" queue="magecopilot_typesense_stock_sync" connection="amqp" handler="MageCopilot\EdgeSync\Model\Queue\Consumer::processMessage"/>
+    <consumer name="magecopilot_typesense_product_sync" queue="magecopilot_typesense_product_sync" connection="amqp" handler="MageCopilot\EdgeSync\Model\Queue\Consumer::processProductMessage"/>
+</config>

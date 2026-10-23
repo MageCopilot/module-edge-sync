@@ -1,0 +1,34 @@
+{
+    "name": "magecopilot/module-edge-sync",
+    "description": "Enterprise Headless CDC Data Pipeline and In-Memory Typesense Indexer for Adobe Commerce & Mage-OS",
+    "type": "magento2-module",
+    "version": "1.0.0",
+    "license": "OSL-3.0",
+    "authors": [
+        {
+            "name": "MageCopilot Team",
+            "email": "support@magecopilot.com",
+            "homepage": "https://magecopilot.com"
+        }
+    ],
+    "require": {
+        "php": "~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
+        "magento/framework": ">=103.0.0",
+        "magento/module-catalog": ">=104.0.0",
+        "magento/module-catalog-rule": ">=101.0.0",
+        "magento/module-directory": ">=100.4.0",
+        "magento/module-store": ">=101.0.0",
+        "magento/module-cron": ">=100.4.0"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "MageCopilot\\EdgeSync\\": ""
+        }
+    },
+    "extra": {
+        "installer-name": "MageCopilot_EdgeSync"
+    }
+}
