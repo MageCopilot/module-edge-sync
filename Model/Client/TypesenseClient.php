@@ -191,6 +191,43 @@ class TypesenseClient
     }
 
     /**
+     * Upsert a synonym rule into a Typesense collection.
+     *
+     * @param string $collectionName
+     * @param string $id
+     * @param array<string, mixed> $synonymData
+     * @return array<string, mixed>
+     */
+    public function upsertSynonym(string $collectionName, string $id, array $synonymData): array
+    {
+        $endpoint = sprintf('/collections/%s/synonyms/%s', urlencode($collectionName), urlencode($id));
+        $response = $this->request('PUT', $endpoint, $synonymData);
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new \RuntimeException(
+                sprintf('Failed to upsert synonym "%s": %s', $id, json_encode($response['data']))
+            );
+        }
+        return $response['data'];
+    }
+
+    /**
+     * Retrieve all configured synonyms for a collection.
+     *
+     * @param string $collectionName
+     * @return list<array<string, mixed>>
+     */
+    public function getSynonyms(string $collectionName): array
+    {
+        try {
+            $endpoint = sprintf('/collections/%s/synonyms', urlencode($collectionName));
+            $response = $this->request('GET', $endpoint);
+            return $response['status'] === 200 ? ($response['data']['synonyms'] ?? []) : [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
      * @param string $method
      * @param string $path
      * @param array<string, mixed>|null $jsonPayload
