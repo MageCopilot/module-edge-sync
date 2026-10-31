@@ -6,6 +6,7 @@
                 <item name="magecopilot_typesense_index" xsi:type="object">MageCopilot\EdgeSync\Console\Command\IndexCommand</item>
                 <item name="magecopilot_seed_catalog" xsi:type="object">MageCopilot\EdgeSync\Console\Command\SeedCatalogCommand</item>
                 <item name="magecopilot_test_stock_sync" xsi:type="object">MageCopilot\EdgeSync\Console\Command\TestStockSyncCommand</item>
+                <item name="magecopilot_sku_charset_report" xsi:type="object">MageCopilot\EdgeSync\Console\Command\SkuCharsetReportCommand</item>
             </argument>
         </arguments>
     </type>

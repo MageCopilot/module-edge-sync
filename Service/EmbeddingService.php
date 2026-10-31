@@ -39,7 +39,7 @@ class EmbeddingService
         }
 
         if (!empty($productData['brand'])) {
-            $parts[] = 'Marca: ' . (string) $productData['brand'];
+            $parts[] = 'Brand: ' . (string) $productData['brand'];
         }
 
         if (!empty($productData['color'])) {
@@ -47,7 +47,7 @@ class EmbeddingService
         }
 
         if (!empty($productData['size'])) {
-            $parts[] = 'Talla/Medida: ' . (string) $productData['size'];
+            $parts[] = 'Size: ' . (string) $productData['size'];
         }
 
         if (!empty($productData['short_description'])) {
@@ -159,7 +159,7 @@ class EmbeddingService
 
         $response = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        unset($ch);
 
         if ($httpCode !== 200 || !is_string($response)) {
             throw new \RuntimeException("OpenAI embedding returned HTTP {$httpCode}: " . substr((string) $response, 0, 200));
@@ -212,7 +212,7 @@ class EmbeddingService
 
         $response = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        unset($ch);
 
         if ($httpCode !== 200 || !is_string($response)) {
             throw new \RuntimeException("Gemini embedding returned HTTP {$httpCode}");

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * MageCopilot - AI-Powered Store Operations Platform
+ *
+ * @category  MageCopilot
+ * @package   MageCopilot_EdgeSync
+ * @author    MageCopilot Team
+ * @copyright Copyright (c) 2026 MageCopilot
+ * @license   Proprietary
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block class="MageCopilot\EdgeSync\Block\Adminhtml\Product\SyncInspector"
+                   name="magecopilot.product.sync_inspector"
+                   template="MageCopilot_EdgeSync::product/sync_inspector.phtml"
+                   before="-"/>
+        </referenceContainer>
+    </body>
+</page>

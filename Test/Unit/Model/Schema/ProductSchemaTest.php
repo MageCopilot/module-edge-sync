@@ -29,7 +29,10 @@ class ProductSchemaTest extends TestCase
         $this->assertContains('name', $fieldNames);
         $this->assertContains('price', $fieldNames);
         $this->assertContains('price_group_0', $fieldNames);
-        $this->assertContains('price_group_2', $fieldNames);
+        $this->assertNotContains('price_group_1', $fieldNames);
+        $this->assertNotContains('price_group_2', $fieldNames);
+        $this->assertNotContains('price_group_3', $fieldNames);
+        $this->assertNotContains('group_prices', $fieldNames);
         $this->assertContains('is_in_stock', $fieldNames);
         $this->assertContains('salable_qty', $fieldNames);
         $this->assertContains('category_ids', $fieldNames);

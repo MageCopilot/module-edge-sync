@@ -24,6 +24,12 @@ class ProductSchema
                 ['name' => 'product_type', 'type' => 'string', 'facet' => true],
                 ['name' => 'description', 'type' => 'string', 'optional' => true],
                 ['name' => 'short_description', 'type' => 'string', 'optional' => true],
+                ['name' => 'description_en', 'type' => 'string', 'optional' => true],
+                ['name' => 'description_es', 'type' => 'string', 'optional' => true],
+                ['name' => 'description_pt', 'type' => 'string', 'optional' => true],
+                ['name' => 'short_description_en', 'type' => 'string', 'optional' => true],
+                ['name' => 'short_description_es', 'type' => 'string', 'optional' => true],
+                ['name' => 'short_description_pt', 'type' => 'string', 'optional' => true],
                 ['name' => 'price', 'type' => 'float', 'facet' => true],
                 ['name' => 'special_price', 'type' => 'float', 'optional' => true, 'facet' => true],
                 ['name' => 'price_usd', 'type' => 'float', 'optional' => true, 'facet' => true],
@@ -34,19 +40,7 @@ class ProductSchema
                 ['name' => 'special_price_eur', 'type' => 'float', 'optional' => true, 'facet' => true],
                 ['name' => 'special_price_gbp', 'type' => 'float', 'optional' => true, 'facet' => true],
                 ['name' => 'special_price_brl', 'type' => 'float', 'optional' => true, 'facet' => true],
-                [
-                    'name' => 'group_prices',
-                    'type' => 'object[]',
-                    'optional' => true,
-                    'fields' => [
-                        ['name' => 'group_id', 'type' => 'int32'],
-                        ['name' => 'price', 'type' => 'float']
-                    ]
-                ],
                 ['name' => 'price_group_0', 'type' => 'float', 'optional' => true, 'facet' => true],
-                ['name' => 'price_group_1', 'type' => 'float', 'optional' => true, 'facet' => true],
-                ['name' => 'price_group_2', 'type' => 'float', 'optional' => true, 'facet' => true],
-                ['name' => 'price_group_3', 'type' => 'float', 'optional' => true, 'facet' => true],
                 ['name' => 'store_ids', 'type' => 'int32[]', 'optional' => true, 'facet' => true],
                 ['name' => 'stores', 'type' => 'string[]', 'optional' => true, 'facet' => true],
                 ['name' => 'category_ids', 'type' => 'int32[]', 'facet' => true],

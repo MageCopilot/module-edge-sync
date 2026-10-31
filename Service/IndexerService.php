@@ -59,7 +59,7 @@ class IndexerService
 
         $partitionedStores = array_map(
             fn(\Magento\Store\Api\Data\StoreInterface $store) => (string) $store->getCode(),
-            $this->storeManager->getStores(true)
+            $this->storeManager->getStores(false)
         );
         if (!in_array('default', $partitionedStores, true)) {
             $partitionedStores[] = 'default';
@@ -155,7 +155,7 @@ class IndexerService
 
         $partitionedStores = array_map(
             fn(\Magento\Store\Api\Data\StoreInterface $store) => (string) $store->getCode(),
-            $this->storeManager->getStores(true)
+            $this->storeManager->getStores(false)
         );
         if (!in_array('default', $partitionedStores, true)) {
             $partitionedStores[] = 'default';
@@ -171,9 +171,9 @@ class IndexerService
 
         $collection = $this->productCollectionFactory->create();
         $collection->addAttributeToSelect('*')
-            ->addMediaGalleryData()
-            ->addTierPriceData()
-            ->addIdFilter($ids);
+            ->addFieldToFilter('entity_id', ['in' => $ids]);
+        $collection->addMediaGalleryData();
+        $collection->addTierPriceData();
 
         $batch = [];
         $failedCount = 0;

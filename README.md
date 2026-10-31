@@ -1,5 +1,8 @@
 # MageCopilot EdgeSync
 
+[![License: OSL-3.0](https://img.shields.io/badge/License-OSL--3.0-blue.svg)](https://opensource.org/licenses/OSL-3.0)
+[![Packagist](https://img.shields.io/packagist/v/magecopilot/module-edge-sync.svg)](https://packagist.org/packages/magecopilot/module-edge-sync)
+
 Enterprise Headless Change Data Capture (CDC) pipeline and in-memory Typesense indexer for Adobe Commerce and Mage-OS.
 
 ## Overview

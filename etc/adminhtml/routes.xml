@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * MageCopilot - AI-Powered Store Operations Platform
+ *
+ * @category  MageCopilot
+ * @package   MageCopilot_EdgeSync
+ * @author    MageCopilot Team
+ * @copyright Copyright (c) 2026 MageCopilot
+ * @license   Proprietary
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:App/etc/routes.xsd">
+    <router id="admin">
+        <route id="magecopilot_edgesync" frontName="magecopilot_edgesync">
+            <module name="MageCopilot_EdgeSync"/>
+        </route>
+    </router>
+</config>

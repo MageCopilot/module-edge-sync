@@ -1,0 +1,450 @@
+<?php
+/**
+ * @var \MageCopilot\EdgeSync\Block\Adminhtml\Product\SyncInspector $block
+ */
+$productId = $block->getProductId();
+$productSku = $block->getProductSku();
+if (!$productId) {
+    return;
+}
+$syncUrl = $block->getSurgicalSyncUrl();
+$previewUrl = $block->getGeneratePreviewTokenUrl();
+?>
+<div id="magecopilot-sync-inspector" class="mc-sync-container" data-product-id="<?= (int) $productId ?>" data-sync-url="<?= $escaper->escapeUrl($syncUrl) ?>" data-preview-url="<?= $escaper->escapeUrl($previewUrl) ?>">
+    <style>
+        .mc-sync-container {
+            background: linear-gradient(135deg, #0b1a19 0%, #112826 100%);
+            border: 1px solid #1f4340;
+            border-radius: 12px;
+            padding: 18px 24px;
+            margin-bottom: 24px;
+            color: #e5edea;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        }
+        .mc-sync-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 12px;
+        }
+        .mc-sync-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+        }
+        .mc-sync-badge {
+            background: rgba(143, 188, 143, 0.15);
+            border: 1px solid rgba(143, 188, 143, 0.35);
+            color: #8FBC8F;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .mc-sync-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+        @media (max-width: 900px) {
+            .mc-sync-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .mc-tier-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            padding: 14px 16px;
+            transition: all 0.2s ease;
+        }
+        .mc-tier-card:hover {
+            border-color: rgba(143, 188, 143, 0.3);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .mc-tier-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 700;
+            color: #a3c2be;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+        }
+        .mc-tier-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .mc-metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mc-metric-label {
+            color: #7b9994;
+            font-size: 12px;
+        }
+        .mc-metric-val {
+            font-weight: 600;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            color: #ffffff;
+        }
+        .mc-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+        .mc-status-hit {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .mc-status-miss {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        .mc-actions-bar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .mc-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            border: none;
+        }
+        .mc-btn-primary {
+            background: #8FBC8F;
+            color: #0b1a19 !important;
+            box-shadow: 0 2px 8px rgba(143, 188, 143, 0.3);
+        }
+        .mc-btn-primary span {
+            color: #0b1a19 !important;
+        }
+        .mc-btn-primary:hover,
+        .mc-btn-primary:focus {
+            background: #a2cfa2;
+            color: #0b1a19 !important;
+            transform: translateY(-1px);
+        }
+        .mc-btn-primary:hover span,
+        .mc-btn-primary:focus span {
+            color: #0b1a19 !important;
+        }
+        .mc-btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .mc-btn-secondary span {
+            color: #ffffff !important;
+        }
+        .mc-btn-secondary:hover,
+        .mc-btn-secondary:focus,
+        .mc-btn-secondary:active {
+            background: rgba(255, 255, 255, 0.18) !important;
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.35) !important;
+        }
+        .mc-btn-secondary:hover span,
+        .mc-btn-secondary:focus span,
+        .mc-btn-secondary:active span {
+            color: #ffffff !important;
+        }
+        .mc-btn[disabled] {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .mc-indicator-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+        .mc-toast {
+            margin-top: 10px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            display: none;
+        }
+        .mc-toast-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #a7f3d0;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+        .mc-toast-error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+    </style>
+
+    <div class="mc-sync-header">
+        <div class="mc-sync-title">
+            <span class="mc-indicator-pulse"></span>
+            <span><?= $escaper->escapeHtml(__('MageCopilot Engine: Real-Time Sync Status')) ?></span>
+            <span class="mc-sync-badge"><?= $escaper->escapeHtml(__('Single Pane of Glass')) ?></span>
+        </div>
+        <div class="mc-actions-bar">
+            <button type="button" id="mc-btn-inspect" class="mc-btn mc-btn-secondary" title="<?= $escaper->escapeHtmlAttr(__('Refresh 3-tier sync readings')) ?>">
+                <span><?= $escaper->escapeHtml(__('Refresh Status')) ?></span>
+            </button>
+            <button type="button" id="mc-btn-preview" class="mc-btn mc-btn-secondary" title="<?= $escaper->escapeHtmlAttr(__('Open unindexed preview draft on Storefront')) ?>">
+                <span><?= $escaper->escapeHtml(__('Preview on Storefront')) ?></span>
+            </button>
+            <button type="button" id="mc-btn-purge" class="mc-btn mc-btn-primary" title="<?= $escaper->escapeHtmlAttr(__('Atomic delta reindex in MySQL, Typesense RAM, and Cloudflare Edge (<800ms)')) ?>">
+                <span><?= $escaper->escapeHtml(__('Surgical Purge & Sync (1-Click)')) ?></span>
+            </button>
+        </div>
+    </div>
+
+    <div class="mc-sync-grid">
+        <!-- 1. MariaDB Tier -->
+        <div class="mc-tier-card">
+            <div class="mc-tier-title">
+                <span><?= $escaper->escapeHtml(__('1. MariaDB (Source of Truth)')) ?></span>
+                <span id="mc-db-status-pill" class="mc-status-pill mc-status-hit"><?= $escaper->escapeHtml(__('Connected')) ?></span>
+            </div>
+            <div class="mc-tier-metrics">
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Catalog Price:')) ?></span>
+                    <span id="mc-db-price" class="mc-metric-val"><?= $escaper->escapeHtml(__('Loading...')) ?></span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Special Price:')) ?></span>
+                    <span id="mc-db-special-price" class="mc-metric-val">-</span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Local Stock:')) ?></span>
+                    <span id="mc-db-stock" class="mc-metric-val">-</span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Last Mutation:')) ?></span>
+                    <span id="mc-db-updated" class="mc-metric-val" style="font-size: 11px;">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Typesense Cloud RAM Tier -->
+        <div class="mc-tier-card">
+            <div class="mc-tier-title">
+                <span><?= $escaper->escapeHtml(__('2. Typesense C++ Cloud RAM')) ?></span>
+                <span id="mc-ts-status-pill" class="mc-status-pill mc-status-hit"><?= $escaper->escapeHtml(__('In Memory')) ?></span>
+            </div>
+            <div class="mc-tier-metrics">
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Indexed Price:')) ?></span>
+                    <span id="mc-ts-price" class="mc-metric-val"><?= $escaper->escapeHtml(__('Loading...')) ?></span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('RAM Stock:')) ?></span>
+                    <span id="mc-ts-stock" class="mc-metric-val">-</span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Search Latency:')) ?></span>
+                    <span id="mc-ts-latency" class="mc-metric-val" style="color: #8FBC8F;">- ms</span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Partitioned Collection:')) ?></span>
+                    <span id="mc-ts-col" class="mc-metric-val" style="font-size: 11px;">products</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Cloudflare Edge CDN Tier -->
+        <div class="mc-tier-card">
+            <div class="mc-tier-title">
+                <span><?= $escaper->escapeHtml(__('3. Cloudflare Edge CDN')) ?></span>
+                <span id="mc-cf-status-pill" class="mc-status-pill mc-status-hit"><?= $escaper->escapeHtml(__('HIT (Active Cache)')) ?></span>
+            </div>
+            <div class="mc-tier-metrics">
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Cache Status:')) ?></span>
+                    <span id="mc-cf-status" class="mc-metric-val">HIT</span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Edge PoP:')) ?></span>
+                    <span id="mc-cf-pop" class="mc-metric-val">MAD / Global</span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Age / Remaining TTL:')) ?></span>
+                    <span id="mc-cf-age" class="mc-metric-val">- s</span>
+                </div>
+                <div class="mc-metric-row">
+                    <span class="mc-metric-label"><?= $escaper->escapeHtml(__('Cache Tag Purge:')) ?></span>
+                    <span id="mc-cf-tag" class="mc-metric-val" style="font-size: 11px;">product_<?= (int) $productId ?></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mc-sync-toast" class="mc-toast"></div>
+</div>
+
+<script>
+require(['jquery'], function($) {
+    'use strict';
+    var container = $('#magecopilot-sync-inspector');
+    if (!container.length) return;
+
+    var productId = container.data('product-id');
+    var syncUrl = container.data('sync-url');
+    var previewUrl = container.data('preview-url');
+
+    var textNone = '<?= $escaper->escapeJs(__('None')) ?>';
+    var textInStock = '<?= $escaper->escapeJs(__('In Stock')) ?>';
+    var textOutOfStock = '<?= $escaper->escapeJs(__('Out of Stock')) ?>';
+    var textNotIndexed = '<?= $escaper->escapeJs(__('Not indexed')) ?>';
+    var textInMemory = '<?= $escaper->escapeJs(__('In Memory')) ?>';
+    var textOutOfSync = '<?= $escaper->escapeJs(__('Out of Sync')) ?>';
+    var textActiveCache = '<?= $escaper->escapeJs(__('HIT (Active Cache)')) ?>';
+    var textPurgeSuccess = '<?= $escaper->escapeJs(__('Surgical purge completed successfully (<800ms)')) ?>';
+    var textInspectError = '<?= $escaper->escapeJs(__('Error inspecting sync status')) ?>';
+    var textSyncError = '<?= $escaper->escapeJs(__('Communication error with SurgicalSync: ')) ?>';
+    var textPreviewFail = '<?= $escaper->escapeJs(__('Could not generate opaque preview token')) ?>';
+    var textPreviewError = '<?= $escaper->escapeJs(__('Error invoking GeneratePreviewToken')) ?>';
+
+    function showToast(msg, isSuccess) {
+        var toast = $('#mc-sync-toast');
+        toast.removeClass('mc-toast-success mc-toast-error')
+            .addClass(isSuccess ? 'mc-toast-success' : 'mc-toast-error')
+            .text(msg)
+            .fadeIn(200);
+        setTimeout(function() { toast.fadeOut(400); }, 5000);
+    }
+
+    function updateUi(data) {
+        if (!data || !data.success) {
+            showToast(data.error || textInspectError, false);
+            return;
+        }
+
+        // MariaDB
+        if (data.mariadb) {
+            $('#mc-db-price').text('$' + Number(data.mariadb.price || 0).toFixed(2));
+            $('#mc-db-special-price').text(data.mariadb.special_price ? '$' + Number(data.mariadb.special_price).toFixed(2) : textNone);
+            $('#mc-db-stock').text((data.mariadb.stock_qty || 0) + ' units (' + (data.mariadb.is_in_stock ? textInStock : textOutOfStock) + ')');
+            $('#mc-db-updated').text(data.mariadb.updated_at || '-');
+        }
+
+        // Typesense
+        if (data.typesense) {
+            $('#mc-ts-price').text(data.typesense.price ? '$' + Number(data.typesense.price).toFixed(2) : textNotIndexed);
+            $('#mc-ts-stock').text((data.typesense.stock_qty || 0) + ' units (' + (data.typesense.is_in_stock ? textInStock : textOutOfStock) + ')');
+            $('#mc-ts-latency').text(data.typesense.latency_ms + ' ms');
+            $('#mc-ts-col').text(data.typesense.collection || 'products');
+            if (data.typesense.synced) {
+                $('#mc-ts-status-pill').removeClass('mc-status-miss').addClass('mc-status-hit').text(textInMemory);
+            } else {
+                $('#mc-ts-status-pill').removeClass('mc-status-hit').addClass('mc-status-miss').text(textOutOfSync);
+            }
+        }
+
+        // Cloudflare
+        if (data.cloudflare) {
+            $('#mc-cf-status').text(data.cloudflare.status || 'HIT');
+            $('#mc-cf-pop').text(data.cloudflare.edge_pop || 'Global');
+            $('#mc-cf-age').text((data.cloudflare.age_seconds || 0) + ' s');
+            $('#mc-cf-tag').text(data.cloudflare.cache_tag || ('product_' + productId));
+            if (data.cloudflare.status === 'HIT') {
+                $('#mc-cf-status-pill').removeClass('mc-status-miss').addClass('mc-status-hit').text(textActiveCache);
+            } else {
+                $('#mc-cf-status-pill').removeClass('mc-status-hit').addClass('mc-status-miss').text(data.cloudflare.status);
+            }
+        }
+    }
+
+    function executeSync(action) {
+        var isPurge = (action === 'purge_sync');
+        var btn = isPurge ? $('#mc-btn-purge') : $('#mc-btn-inspect');
+        btn.prop('disabled', true);
+
+        $.ajax({
+            url: syncUrl,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                product_id: productId,
+                action: action,
+                form_key: window.FORM_KEY
+            },
+            success: function(resp) {
+                btn.prop('disabled', false);
+                updateUi(resp);
+                if (isPurge && resp.success) {
+                    showToast(resp.message || textPurgeSuccess, true);
+                }
+            },
+            error: function(xhr) {
+                btn.prop('disabled', false);
+                showToast(textSyncError + (xhr.statusText || 'Error'), false);
+            }
+        });
+    }
+
+    // Handlers
+    $('#mc-btn-inspect').on('click', function() { executeSync('inspect'); });
+    $('#mc-btn-purge').on('click', function() { executeSync('purge_sync'); });
+
+    $('#mc-btn-preview').on('click', function() {
+        var btn = $(this);
+        btn.prop('disabled', true);
+        $.ajax({
+            url: previewUrl,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                product_id: productId,
+                form_key: window.FORM_KEY
+            },
+            success: function(resp) {
+                btn.prop('disabled', false);
+                if (resp.success && resp.preview_url) {
+                    window.open(resp.preview_url, '_blank');
+                } else {
+                    showToast(resp.error || textPreviewFail, false);
+                }
+            },
+            error: function() {
+                btn.prop('disabled', false);
+                showToast(textPreviewError, false);
+            }
+        });
+    });
+
+    // Initial inspection on page load
+    executeSync('inspect');
+});
+</script>

@@ -174,38 +174,37 @@ class Consumer
          $this->logger->info('[MageCopilot_EdgeSync] Product consumer received message: ' . $rawMessage);
 
          $payload = json_decode($rawMessage, true);
-         if (!is_array($payload)) {
-             return;
-         }
+        if (!is_array($payload)) {
+            return;
+        }
 
          $ids = $payload['ids'] ?? [];
          $skus = $payload['skus'] ?? [];
 
-         if (empty($ids) && !empty($skus)) {
-             foreach ($skus as $sku) {
-                 $id = $this->productResource->getIdBySku($sku);
-                 if ($id) {
-                     $ids[] = (int) $id;
-                 }
-             }
-         }
+        if (empty($ids) && !empty($skus)) {
+            foreach ($skus as $sku) {
+                $id = $this->productResource->getIdBySku($sku);
+                if ($id) {
+                    $ids[] = (int) $id;
+                }
+            }
+        }
 
-         if (empty($ids)) {
-             $this->logger->warning('[MageCopilot_EdgeSync] No product IDs resolved for reindexing');
-             return;
-         }
+        if (empty($ids)) {
+            $this->logger->warning('[MageCopilot_EdgeSync] No product IDs resolved for reindexing');
+            return;
+        }
 
          $ids = array_values(array_unique(array_map('intval', $ids)));
-         if ($this->indexerService !== null) {
-             $res = $this->indexerService->reindexIds($ids);
-             $this->logger->info(sprintf(
-                 '[MageCopilot_EdgeSync] Consumer reindexed %d products (%d failed)',
-                 $res['indexed'] ?? 0,
-                 $res['failed'] ?? 0
-             ));
-         } else {
-             $this->logger->warning('[MageCopilot_EdgeSync] IndexerService unavailable in consumer for product delta sync');
-         }
-     }
+        if ($this->indexerService !== null) {
+            $res = $this->indexerService->reindexIds($ids);
+            $this->logger->info(sprintf(
+                '[MageCopilot_EdgeSync] Consumer reindexed %d products (%d failed)',
+                $res['indexed'] ?? 0,
+                $res['failed'] ?? 0
+            ));
+        } else {
+            $this->logger->warning('[MageCopilot_EdgeSync] IndexerService unavailable in consumer for product delta sync');
+        }
+    }
 }
-

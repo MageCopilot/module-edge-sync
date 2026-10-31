@@ -228,6 +228,81 @@ class TypesenseClient
     }
 
     /**
+     * Upsert a curation override rule into a Typesense collection.
+     *
+     * @param string $collectionName
+     * @param string $id
+     * @param array<string, mixed> $overrideData
+     * @return array<string, mixed>
+     */
+    public function upsertOverride(string $collectionName, string $id, array $overrideData): array
+    {
+        $endpoint = sprintf('/collections/%s/overrides/%s', urlencode($collectionName), urlencode($id));
+        $response = $this->request('PUT', $endpoint, $overrideData);
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new \RuntimeException(
+                sprintf('Failed to upsert override "%s": %s', $id, json_encode($response['data']))
+            );
+        }
+        return $response['data'];
+    }
+
+    /**
+     * Retrieve a specific curation override by ID.
+     *
+     * @param string $collectionName
+     * @param string $id
+     * @return array<string, mixed>|null
+     */
+    public function getOverride(string $collectionName, string $id): ?array
+    {
+        try {
+            $endpoint = sprintf('/collections/%s/overrides/%s', urlencode($collectionName), urlencode($id));
+            $response = $this->request('GET', $endpoint);
+            return $response['status'] === 200 ? $response['data'] : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Delete a curation override by ID.
+     *
+     * @param string $collectionName
+     * @param string $id
+     * @return bool
+     */
+    public function deleteOverride(string $collectionName, string $id): bool
+    {
+        try {
+            $endpoint = sprintf('/collections/%s/overrides/%s', urlencode($collectionName), urlencode($id));
+            $response = $this->request('DELETE', $endpoint);
+            return $response['status'] === 200 || $response['status'] === 404;
+        } catch (\Throwable $e) {
+            $this->logger->warning('[MageCopilot_EdgeSync] Failed to delete override: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Retrieve all configured curation overrides for a collection.
+     *
+     * @param string $collectionName
+     * @return list<array<string, mixed>>
+     */
+    public function getOverrides(string $collectionName): array
+    {
+        try {
+            $endpoint = sprintf('/collections/%s/overrides', urlencode($collectionName));
+            $response = $this->request('GET', $endpoint);
+            return $response['status'] === 200 ? ($response['data']['overrides'] ?? []) : [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+
+    /**
      * @param string $method
      * @param string $path
      * @param array<string, mixed>|null $jsonPayload

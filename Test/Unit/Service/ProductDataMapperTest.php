@@ -73,21 +73,64 @@ class ProductDataMapperTest extends TestCase
             public function __construct()
             {
             }
-            public function getId() { return 42; }
-            public function getSku() { return 'TEST-SKU-001'; }
-            public function getName() { return 'Premium Test Headphones'; }
-            public function getDescription() { return '<p>Detailed description</p>'; }
-            public function getShortDescription() { return 'Short desc'; }
-            public function getPrice() { return 150.00; }
-            public function getSpecialPrice() { return 120.00; }
-            public function getSpecialFromDate() { return null; }
-            public function getSpecialToDate() { return null; }
-            public function getCategoryIds() { return [14]; }
-            public function getImage() { return '/t/e/test.jpg'; }
-            public function getMediaGalleryEntries() { return []; }
-            public function getUrlKey() { return 'premium-test-headphones'; }
-            public function getCreatedAt() { return '2026-01-01 00:00:00'; }
-            public function getTierPrices() {
+            public function getId()
+            {
+                return 42;
+            }
+            public function getSku()
+            {
+                return 'TEST-SKU-001';
+            }
+            public function getName()
+            {
+                return 'Premium Test Headphones';
+            }
+            public function getDescription()
+            {
+                return '<p>Detailed description</p>';
+            }
+            public function getShortDescription()
+            {
+                return 'Short desc';
+            }
+            public function getPrice()
+            {
+                return 150.00;
+            }
+            public function getSpecialPrice()
+            {
+                return 120.00;
+            }
+            public function getSpecialFromDate()
+            {
+                return null;
+            }
+            public function getSpecialToDate()
+            {
+                return null;
+            }
+            public function getCategoryIds()
+            {
+                return [14];
+            }
+            public function getImage()
+            {
+                return '/t/e/test.jpg';
+            }
+            public function getMediaGalleryEntries()
+            {
+                return [];
+            }
+            public function getUrlKey()
+            {
+                return 'premium-test-headphones';
+            }
+            public function getCreatedAt()
+            {
+                return '2026-01-01 00:00:00';
+            }
+            public function getTierPrices()
+            {
                 return $this->getData('tier_prices') ?: [];
             }
         };
@@ -129,19 +172,58 @@ class ProductDataMapperTest extends TestCase
             public function __construct()
             {
             }
-            public function getId() { return 10; }
-            public function getSku() { return 'LEGACY-SKU'; }
-            public function getName() { return 'Legacy Product'; }
-            public function getPrice() { return 50.00; }
-            public function getSpecialPrice() { return null; }
-            public function getCategoryIds() { return []; }
-            public function getTierPrices() { return []; }
-            public function getDescription() { return ''; }
-            public function getShortDescription() { return ''; }
-            public function getImage() { return null; }
-            public function getMediaGalleryEntries() { return []; }
-            public function getUrlKey() { return 'legacy-product'; }
-            public function getCreatedAt() { return '2026-01-01'; }
+            public function getId()
+            {
+                return 10;
+            }
+            public function getSku()
+            {
+                return 'LEGACY-SKU';
+            }
+            public function getName()
+            {
+                return 'Legacy Product';
+            }
+            public function getPrice()
+            {
+                return 50.00;
+            }
+            public function getSpecialPrice()
+            {
+                return null;
+            }
+            public function getCategoryIds()
+            {
+                return [];
+            }
+            public function getTierPrices()
+            {
+                return [];
+            }
+            public function getDescription()
+            {
+                return '';
+            }
+            public function getShortDescription()
+            {
+                return '';
+            }
+            public function getImage()
+            {
+                return null;
+            }
+            public function getMediaGalleryEntries()
+            {
+                return [];
+            }
+            public function getUrlKey()
+            {
+                return 'legacy-product';
+            }
+            public function getCreatedAt()
+            {
+                return '2026-01-01';
+            }
         };
 
         $stockItemStub = $this->createStub(StockItemInterface::class);
@@ -191,20 +273,61 @@ class ProductDataMapperTest extends TestCase
         );
 
         $productStub = new class extends Product {
-            public function __construct() {}
-            public function getId() { return 88; }
-            public function getSku() { return 'DYNAMIC-FX-SKU'; }
-            public function getName() { return 'Dynamic FX Product'; }
-            public function getPrice() { return 200.00; }
-            public function getSpecialPrice() { return null; }
-            public function getCategoryIds() { return []; }
-            public function getTierPrices() { return []; }
-            public function getDescription() { return ''; }
-            public function getShortDescription() { return ''; }
-            public function getImage() { return null; }
-            public function getMediaGalleryEntries() { return []; }
-            public function getUrlKey() { return 'dynamic-fx-sku'; }
-            public function getCreatedAt() { return '2026-01-01'; }
+            public function __construct()
+            {
+            }
+            public function getId()
+            {
+                return 88;
+            }
+            public function getSku()
+            {
+                return 'DYNAMIC-FX-SKU';
+            }
+            public function getName()
+            {
+                return 'Dynamic FX Product';
+            }
+            public function getPrice()
+            {
+                return 200.00;
+            }
+            public function getSpecialPrice()
+            {
+                return null;
+            }
+            public function getCategoryIds()
+            {
+                return [];
+            }
+            public function getTierPrices()
+            {
+                return [];
+            }
+            public function getDescription()
+            {
+                return '';
+            }
+            public function getShortDescription()
+            {
+                return '';
+            }
+            public function getImage()
+            {
+                return null;
+            }
+            public function getMediaGalleryEntries()
+            {
+                return [];
+            }
+            public function getUrlKey()
+            {
+                return 'dynamic-fx-sku';
+            }
+            public function getCreatedAt()
+            {
+                return '2026-01-01';
+            }
         };
 
         $this->isSalableStub->method('execute')->willReturn(true);
@@ -237,4 +360,3 @@ class ProductDataMapperTest extends TestCase
         $this->assertSame(85.0, $group2Entry['price']);
     }
 }
-

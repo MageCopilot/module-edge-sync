@@ -149,7 +149,7 @@ class ProductDataMapper
         $bundleOptions = null;
 
         if ($typeId === ConfigurableType::TYPE_CODE) {
-            $configData = $this->resolveConfigurableData($product);
+            $configData = $this->resolveConfigurableData($product, $websiteId);
             if ($configData) {
                 $configurableOptions = $configData['configurable_options'];
                 $variants = $configData['variants'];
@@ -189,6 +189,12 @@ class ProductDataMapper
             'product_type' => $typeId,
             'description' => (string) ($product->getData('description') ?: ''),
             'short_description' => (string) ($product->getData('short_description') ?: ''),
+            'description_en' => (string) ($product->getData('description_en') ?: $product->getData('description') ?: ''),
+            'description_es' => (string) ($product->getData('description_es') ?: ''),
+            'description_pt' => (string) ($product->getData('description_pt') ?: ''),
+            'short_description_en' => (string) ($product->getData('short_description_en') ?: $product->getData('short_description') ?: ''),
+            'short_description_es' => (string) ($product->getData('short_description_es') ?: ''),
+            'short_description_pt' => (string) ($product->getData('short_description_pt') ?: ''),
             'price' => $price,
             'special_price' => $specialPrice,
             'price_usd' => (float) $price,
@@ -259,7 +265,7 @@ class ProductDataMapper
      * @param Product $product
      * @return array<string, mixed>|null
      */
-    private function resolveConfigurableData(Product $product): ?array
+    private function resolveConfigurableData(Product $product, int $websiteId = 1): ?array
     {
         try {
             $typeInstance = $product->getTypeInstance();
@@ -489,7 +495,9 @@ class ProductDataMapper
                     $upSellSkus[] = (string) $row['sku'];
                 }
             }
-        } catch (\Throwable) {}
+        } catch (\Throwable) {
+
+        }
 
         return [
             'cross_sell_skus' => array_values(array_unique($crossSellSkus)),
