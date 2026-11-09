@@ -3,6 +3,17 @@
     "description": "Enterprise Headless CDC Data Pipeline and In-Memory Typesense Indexer for Adobe Commerce & Mage-OS",
     "type": "magento2-module",
     "license": "OSL-3.0",
+    "homepage": "https://magecopilot.com",
+    "keywords": [
+        "magento2",
+        "mage-os",
+        "adobe-commerce",
+        "typesense",
+        "search",
+        "cdc",
+        "indexer",
+        "headless"
+    ],
     "authors": [
         {
             "name": "MageCopilot Team",
@@ -10,6 +21,10 @@
             "homepage": "https://magecopilot.com"
         }
     ],
+    "support": {
+        "issues": "https://github.com/MageCopilot/module-edge-sync/issues",
+        "source": "https://github.com/MageCopilot/module-edge-sync"
+    },
     "require": {
         "php": "~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
         "magento/framework": "^103.0",
