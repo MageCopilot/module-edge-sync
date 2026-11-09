@@ -28,7 +28,7 @@ class SeedCatalogCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $count = (int) ($input->getOption('count') ?: 50);
-        $output->writeln(sprintf('<info>[MageCopilot Storefront Engine] Iniciando generación de catálogo (%d productos)...</info>', $count));
+        $output->writeln(sprintf('<info>[MageCopilot Storefront Engine] Starting catalog generation (%d products)...</info>', $count));
 
         $logCallback = function (string $message) use ($output) {
             $output->writeln($message);
@@ -37,13 +37,13 @@ class SeedCatalogCommand extends Command
         try {
             $results = $this->seederService->seed($logCallback, $count);
             $output->writeln(sprintf(
-                '<info>✓ Proceso completado exitosamente: %d categorías y %d productos creados.</info>',
+                '<info>[MageCopilot] Process completed successfully: %d categories and %d products created.</info>',
                 $results['categories'],
                 $results['products']
             ));
             return Command::SUCCESS;
         } catch (\Throwable $e) {
-            $output->writeln(sprintf('<error>Error en seeder: %s</error>', $e->getMessage()));
+            $output->writeln(sprintf('<error>Error in seeder: %s</error>', $e->getMessage()));
             return Command::FAILURE;
         }
     }

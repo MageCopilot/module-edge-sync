@@ -104,7 +104,7 @@ class SkuCharsetReportCommand extends Command
             }
         }
 
-        $avgLen = $totalSkus > 0 ? round($totalLen / $totalSkus, 2) : 0;
+        $avgLen = round($totalLen / $totalSkus, 2);
 
         // Render Summary Table
         $table = new Table($output);

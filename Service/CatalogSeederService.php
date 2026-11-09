@@ -37,8 +37,16 @@ class CatalogSeederService
     ) {
     }
 
+    /**
+     * Seed catalog data
+     *
+     * @param callable $logCallback
+     * @param int $count
+     * @return array{categories: int, products: int}
+     */
     public function seed(callable $logCallback, int $count = 50): array
     {
+        $this->logger->info(sprintf('[MageCopilot_EdgeSync] Starting catalog seed with target count %d', $count));
         try {
             $this->appState->setAreaCode('frontend');
         } catch (\Throwable) {
@@ -56,9 +64,14 @@ class CatalogSeederService
         ];
     }
 
+    /**
+     * @param array<string, int> $categories
+     * @param callable $log
+     * @return int
+     */
     private function seedConfigurablesAndBundles(array $categories, callable $log): int
     {
-        $log('Configurando super-atributos y sembrando productos configurables & bundles...');
+        $log('Configuring super-attributes and seeding configurable & bundle products...');
 
         if ($this->resourceConnection === null) {
             $this->resourceConnection = \Magento\Framework\App\ObjectManager::getInstance()->get(
@@ -107,10 +120,15 @@ class CatalogSeederService
         return $created;
     }
 
+    /**
+     * @param callable $log
+     * @return array<string, int>
+     */
     private function seedCategories(callable $log): array
     {
-        $log('Verificando y creando estructura de categorías...');
-        $rootId = (int) $this->storeManager->getStore()->getRootCategoryId();
+        $log('Verifying and generating category tree structure...');
+        $store = $this->storeManager->getStore();
+        $rootId = (int) ($store instanceof \Magento\Store\Model\Store ? $store->getRootCategoryId() : 2);
         if ($rootId <= 0) {
             $rootId = 2;
         }
@@ -146,7 +164,7 @@ class CatalogSeederService
         foreach ($categoryTree as $parentName => $subNames) {
             $parentCat = $this->findOrCreateCategory($parentName, $rootId);
             $categoryMap[$parentName] = (int) $parentCat->getId();
-            $log(" ✓ Categoría principal: {$parentName} (ID: {$parentCat->getId()})");
+            $log(" [OK] Primary category: {$parentName} (ID: {$parentCat->getId()})");
 
             foreach ($subNames as $subName) {
                 $subCat = $this->findOrCreateCategory($subName, (int) $parentCat->getId());
@@ -159,12 +177,14 @@ class CatalogSeederService
 
     private function findOrCreateCategory(string $name, int $parentId): Category
     {
-        $cat = $this->categoryFactory->create()->getCollection()
+        /** @var \Magento\Catalog\Model\ResourceModel\Category\Collection $collection */
+        $collection = $this->categoryFactory->create()->getCollection();
+        $cat = $collection
             ->addAttributeToFilter('name', $name)
-            ->addAttributeToFilter('parent_id', $parentId)
+            ->addAttributeToFilter('parent_id', (string) $parentId)
             ->getFirstItem();
 
-        if ($cat->getId()) {
+        if ($cat instanceof Category && $cat->getId()) {
             return $cat;
         }
 
@@ -217,7 +237,7 @@ class CatalogSeederService
                 $customer->setLastname($cData['lastname']);
                 $customer->setGroupId($cData['group_id']);
                 $this->customerRepository->save($customer);
-                $log(" ✓ Creado cliente {$cData['email']} [Grupo {$cData['group_id']}]");
+                $log(" [OK] Created customer {$cData['email']} [Group {$cData['group_id']}]");
             }
         }
     }
@@ -287,7 +307,7 @@ class CatalogSeederService
                     'entity_pk_value' => $productId,
                     'status_id' => 1
                 ]);
-                $reviewId = (int) $conn->lastInsertId('review');
+                $reviewId = (int) $conn->fetchOne('SELECT LAST_INSERT_ID()');
 
                 $conn->insert('review_detail', [
                     'review_id' => $reviewId,
@@ -331,6 +351,6 @@ class CatalogSeederService
             }
         }
 
-        $log(' ✓ Opiniones de clientes y social proof verificadas sembradas para productos insignia.');
+        $log(' [MageCopilot] Customer reviews and verified social proof seeded for flagship products.');
     }
 }

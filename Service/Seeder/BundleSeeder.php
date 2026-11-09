@@ -4,13 +4,23 @@ declare(strict_types=1);
 namespace MageCopilot\EdgeSync\Service\Seeder;
 
 use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ProductFactory;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
+use Magento\Framework\DB\Adapter\AdapterInterface;
 
+/**
+ * Seeder for bundle products with composite options and selections
+ */
 class BundleSeeder
 {
+    /**
+     * @param ProductFactory $productFactory
+     * @param ProductRepositoryInterface $productRepository
+     * @param StockRegistryInterface $stockRegistry
+     */
     public function __construct(
         private ProductFactory $productFactory,
         private ProductRepositoryInterface $productRepository,
@@ -18,13 +28,22 @@ class BundleSeeder
     ) {
     }
 
-    public function seedAthleteBundle(array $categories, $conn, callable $log): int
+    /**
+     * @param array<string, int> $categories
+     * @param AdapterInterface $conn
+     * @param callable $log
+     * @return int
+     */
+    public function seedAthleteBundle(array $categories, AdapterInterface $conn, callable $log): int
     {
         $bundleSku = 'MC-PRO-BUNDLE';
         $catId = $categories['Gear & Accessories > Technical Backpacks'] ?? 14;
 
         try {
             $bundle = $this->productRepository->get($bundleSku);
+            if (!$bundle instanceof Product) {
+                $bundle = $this->productFactory->create();
+            }
         } catch (\Throwable) {
             $bundle = $this->productFactory->create();
         }
@@ -36,19 +55,19 @@ class BundleSeeder
         $bundle->setStatus(Status::STATUS_ENABLED);
         $bundle->setVisibility(Visibility::VISIBILITY_BOTH);
         $bundle->setPrice(199.00);
-        $bundle->setSpecialPrice(179.00);
+        $bundle->setData('special_price', 179.00);
         $bundle->setData('price_type', 1); // Fixed Price
         $bundle->setData('sku_type', 1);
         $bundle->setData('weight_type', 1);
         $bundle->setData('price_view', 1);
         $bundle->setData('shipment_type', 0);
         $bundle->setWeight(1.5);
-        $bundle->setTaxClassId(2);
-        $bundle->setDescription('<p>El kit definitivo de equipamiento para atletas de alto rendimiento. Incluye mochila técnica impermeable, camiseta de algodón Supima y termo térmico deportivo con un 25% de descuento especial.</p>');
-        $bundle->setShortDescription('Kit pro de entrenamiento con mochila, camiseta técnica y accesorio con descuento.');
+        $bundle->setData('tax_class_id', 2);
+        $bundle->setData('description', '<p>The ultimate performance equipment kit for high-demand athletes. Includes waterproof technical backpack, Supima organic cotton tee, and insulated sports vacuum flask with special savings.</p>');
+        $bundle->setData('short_description', 'Pro training kit featuring technical backpack, performance tee, and insulated flask.');
         $bundle->setUrlKey('pro-athlete-performance-bundle');
         $bundle->setWebsiteIds([1]);
-        $bundle->setCategoryIds([$catId]);
+        $bundle->setData('category_ids', [$catId]);
 
         $savedBundle = $this->productRepository->save($bundle);
         $bundleId = (int) $savedBundle->getId();
@@ -56,8 +75,8 @@ class BundleSeeder
         $stockItem = $this->stockRegistry->getStockItem($bundleId);
         $stockItem->setQty(50);
         $stockItem->setIsInStock(true);
-        $stockItem->setManageStock(1);
-        $stockItem->setUseConfigManageStock(1);
+        $stockItem->setManageStock(true);
+        $stockItem->setUseConfigManageStock(true);
         $this->stockRegistry->updateStockItemBySku($bundleSku, $stockItem);
 
         // Get simple product IDs for bundle selections
@@ -77,11 +96,11 @@ class BundleSeeder
                 'position' => 1,
                 'type' => 'select'
             ]);
-            $opt1Id = (int) $conn->lastInsertId();
+            $opt1Id = (int) $conn->fetchOne('SELECT LAST_INSERT_ID()');
             $conn->insert('catalog_product_bundle_option_value', [
                 'option_id' => $opt1Id,
                 'store_id' => 0,
-                'title' => 'Mochila Técnica (Base)',
+                'title' => 'Technical Backpack (Base)',
                 'parent_product_id' => $bundleId
             ]);
             $conn->insert('catalog_product_bundle_selection', [
@@ -103,11 +122,11 @@ class BundleSeeder
                 'position' => 2,
                 'type' => 'select'
             ]);
-            $opt2Id = (int) $conn->lastInsertId();
+            $opt2Id = (int) $conn->fetchOne('SELECT LAST_INSERT_ID()');
             $conn->insert('catalog_product_bundle_option_value', [
                 'option_id' => $opt2Id,
                 'store_id' => 0,
-                'title' => 'Prenda Superior de Entrenamiento',
+                'title' => 'Training Top Apparel',
                 'parent_product_id' => $bundleId
             ]);
             $conn->insert('catalog_product_bundle_selection', [
@@ -143,11 +162,11 @@ class BundleSeeder
                     'position' => 3,
                     'type' => 'checkbox'
                 ]);
-                $opt3Id = (int) $conn->lastInsertId();
+                $opt3Id = (int) $conn->fetchOne('SELECT LAST_INSERT_ID()');
                 $conn->insert('catalog_product_bundle_option_value', [
                     'option_id' => $opt3Id,
                     'store_id' => 0,
-                    'title' => 'Accesorio Opcional',
+                    'title' => 'Optional Accessory',
                     'parent_product_id' => $bundleId
                 ]);
                 $conn->insert('catalog_product_bundle_selection', [
@@ -173,7 +192,7 @@ class BundleSeeder
             }
         }
 
-        $log(" ✓ Producto Bundle '{$bundleSku}' creado con opciones configurables.");
+        $log(" [OK] Bundle product '{$bundleSku}' created with configurable options.");
         return 1;
     }
 }

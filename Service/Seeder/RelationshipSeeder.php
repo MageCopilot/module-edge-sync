@@ -3,9 +3,19 @@ declare(strict_types=1);
 
 namespace MageCopilot\EdgeSync\Service\Seeder;
 
+use Magento\Framework\DB\Adapter\AdapterInterface;
+
+/**
+ * Seeder for product cross-sell and up-sell relationships
+ */
 class RelationshipSeeder
 {
-    public function seedCrossSellLinks($conn, callable $log): void
+    /**
+     * @param AdapterInterface $conn
+     * @param callable $log
+     * @return void
+     */
+    public function seedCrossSellLinks(AdapterInterface $conn, callable $log): void
     {
         $hoodieId = (int) $conn->fetchOne("SELECT entity_id FROM catalog_product_entity WHERE sku = 'MC-APEX-HOODIE'");
         $sneakersId = (int) $conn->fetchOne("SELECT entity_id FROM catalog_product_entity WHERE sku = 'MC-AEROGLIDE-SNK'");
@@ -22,7 +32,7 @@ class RelationshipSeeder
                        ({$sneakersId}, {$hoodieId}, 5),
                        ({$sneakersId}, {$backpackId}, 5);
             ");
-            $log(' ✓ Enlaces de Cross-sell y Up-sell registrados entre productos.');
+            $log(' [MageCopilot] Cross-sell and Up-sell links registered between products.');
         }
     }
 }

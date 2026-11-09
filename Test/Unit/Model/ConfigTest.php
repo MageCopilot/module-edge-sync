@@ -5,6 +5,7 @@ namespace MageCopilot\EdgeSync\Test\Unit\Model;
 
 use MageCopilot\EdgeSync\Model\Config;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -12,12 +13,14 @@ use PHPUnit\Framework\TestCase;
 class ConfigTest extends TestCase
 {
     private ScopeConfigInterface&MockObject $scopeConfigMock;
+    private EncryptorInterface&MockObject $encryptorMock;
     private Config $config;
 
     protected function setUp(): void
     {
         $this->scopeConfigMock = $this->createMock(ScopeConfigInterface::class);
-        $this->config = new Config($this->scopeConfigMock);
+        $this->encryptorMock = $this->createMock(EncryptorInterface::class);
+        $this->config = new Config($this->scopeConfigMock, $this->encryptorMock);
     }
 
     public function testIsEnabledReturnsTrueWhenConfigured(): void
@@ -50,14 +53,31 @@ class ConfigTest extends TestCase
         $this->assertSame('http://typesense:8108', $this->config->getHost());
     }
 
-    public function testGetApiKeyReturnsDefaultWhenEmpty(): void
+    public function testGetApiKeyReturnsEmptyWhenNotConfigured(): void
     {
         $this->scopeConfigMock->expects($this->once())
             ->method('getValue')
             ->with('magecopilot_edgesync/general/typesense_api_key', ScopeInterface::SCOPE_STORE, null)
             ->willReturn(null);
 
-        $this->assertSame('magecopilot_local_dev_secret_key', $this->config->getApiKey());
+        $this->assertSame('', $this->config->getApiKey());
+    }
+
+    public function testGetApiKeyDecryptsEncryptedValue(): void
+    {
+        $encryptorMock = $this->createMock(\Magento\Framework\Encryption\EncryptorInterface::class);
+        $encryptorMock->expects($this->once())
+            ->method('decrypt')
+            ->with('0:3:encrypted_secret')
+            ->willReturn('decrypted_admin_secret');
+
+        $this->scopeConfigMock->expects($this->once())
+            ->method('getValue')
+            ->with('magecopilot_edgesync/general/typesense_api_key', ScopeInterface::SCOPE_STORE, null)
+            ->willReturn('0:3:encrypted_secret');
+
+        $configWithEncryptor = new Config($this->scopeConfigMock, $encryptorMock);
+        $this->assertSame('decrypted_admin_secret', $configWithEncryptor->getApiKey());
     }
 
     public function testGetCollectionNameReturnsDefault(): void

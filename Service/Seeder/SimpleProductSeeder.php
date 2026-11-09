@@ -21,9 +21,15 @@ class SimpleProductSeeder
     ) {
     }
 
+    /**
+     * @param array<string, int> $categories
+     * @param callable $log
+     * @param int $targetCount
+     * @return int
+     */
     public function seedProducts(array $categories, callable $log, int $targetCount = 50): int
     {
-        $log(sprintf('Generando catálogo rico de productos (Meta: %d SKUs)...', $targetCount));
+        $log(sprintf('Generating rich product catalog (Target: %d SKUs)...', $targetCount));
 
         $catalogDefinitions = [
             // Men's Hoodies & Jackets
@@ -37,7 +43,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 140,
                 'img' => 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Sudadera técnica de alto rendimiento con acabado repelente al agua y aislamiento térmico micro-fleece. Ideal para entrenamiento y uso urbano diario.</p>'
+                'desc' => '<p>High-performance technical hoodie with water-repellent finish and micro-fleece thermal insulation. Engineered for athletic training and daily urban commuting.</p>'
             ],
             [
                 'sku' => 'MC-HD-NVY-02',
@@ -49,7 +55,7 @@ class SimpleProductSeeder
                 'special_price' => 84.99,
                 'stock' => 85,
                 'img' => 'https://images.unsplash.com/photo-1578587018452-892bacefd3f2?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Edición azul marino de nuestra sudadera insignia. Tejido transpirable de cuatro vías con capucha ergonómica y bolsillo para smartphone.</p>'
+                'desc' => '<p>Navy blue edition of our flagship hoodie. Four-way stretch breathable fabric with an ergonomic hood and secure smartphone zip pocket.</p>'
             ],
             [
                 'sku' => 'MC-JK-STORM-01',
@@ -61,7 +67,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 60,
                 'img' => 'https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Chaqueta técnica de 3 capas con membrana impermeable y transpirable 20k/20k. Costuras totalmente termoselladas y cremalleras YKK AquaGuard.</p>'
+                'desc' => '<p>3-layer technical jacket with 20k/20k waterproof and breathable membrane. Fully taped seams and YKK AquaGuard water-resistant zippers.</p>'
             ],
             [
                 'sku' => 'MC-TS-CORE-BLK',
@@ -73,7 +79,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 220,
                 'img' => 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Camiseta técnica sin costuras de secado ultra-rápido. Tratamiento anti-olor con iones de plata y zonas de ventilación de mapeo corporal.</p>'
+                'desc' => '<p>Seamless technical performance tee engineered for ultra-fast moisture dispersal. Anti-odor silver ion treatment with strategic body-mapped ventilation zones.</p>'
             ],
             [
                 'sku' => 'MC-SN-RUN-01',
@@ -85,7 +91,7 @@ class SimpleProductSeeder
                 'special_price' => 175.00,
                 'stock' => 95,
                 'img' => 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Zapatillas de running para competición con placa de fibra de carbono y espuma supercrítica de retorno energético. Peso pluma de 190 gramos.</p>'
+                'desc' => '<p>Competition-ready marathon running shoes with embedded carbon fiber plate and supercritical energy-return foam. Featherlight 190-gram profile.</p>'
             ],
             // Women's Tops & Bottoms
             [
@@ -98,7 +104,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 180,
                 'img' => 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Top de compresión media con sujeción anatómica y banda elástica reforzada. Tejido de tacto suave con tecnología de absorción de sudor.</p>'
+                'desc' => '<p>Medium-compression athletic crop top with anatomical support and reinforced elastic underband. Ultra-soft sweat-wicking performance fabric.</p>'
             ],
             [
                 'sku' => 'MC-W-LEG-01',
@@ -110,7 +116,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 210,
                 'img' => 'https://images.unsplash.com/photo-1506619216599-9d16d0903dfd?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Mallas de compresión gradual con cintura alta anti-deslizamiento y bolsillo oculto para llaves. Tejido 100% opaco a prueba de sentadillas.</p>'
+                'desc' => '<p>Graduated compression high-waist leggings with anti-slip waistband and concealed key pocket. 100% opaque squat-proof knit.</p>'
             ],
             [
                 'sku' => 'MC-W-PRK-01',
@@ -122,7 +128,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 45,
                 'img' => 'https://images.unsplash.com/photo-1539533018447-63fcce667883?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Parka técnica con relleno de plumón sintético reciclado de 800 fill power. Acabado repelente al agua DWR libre de fluorocarbonos.</p>'
+                'desc' => '<p>Technical winter parka insulated with 800-fill-power recycled synthetic down. Finished with fluorocarbon-free DWR water repellency.</p>'
             ],
             [
                 'sku' => 'MC-W-SHOE-01',
@@ -134,7 +140,7 @@ class SimpleProductSeeder
                 'special_price' => 149.99,
                 'stock' => 115,
                 'img' => 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Calzado de entrenamiento diario con máxima amortiguación para protección articular en tiradas largas de asfalto y pista.</p>'
+                'desc' => '<p>Daily training footwear featuring plush maximum cushioning for joint protection on long-distance road and track sessions.</p>'
             ],
             // Gear & Accessories
             [
@@ -147,7 +153,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 90,
                 'img' => 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Mochila impermeable construida en Cordura 500D con compartimento estanco acolchado para portátil de hasta 16" y sistema MOLLE cortado por láser.</p>'
+                'desc' => '<p>Waterproof tactical backpack constructed from Cordura 500D with sealed padded compartment for up to 16" laptops and laser-cut MOLLE webbing.</p>'
             ],
             [
                 'sku' => 'MC-WAT-PRO-01',
@@ -159,7 +165,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 70,
                 'img' => 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Reloj deportivo con bisel de titanio, cristal de zafiro, mapas topográficos offline, sensor SpO2, altímetro barométrico y 21 días de batería.</p>'
+                'desc' => '<p>GPS multi-sport smartwatch with titanium bezel, sapphire crystal lens, offline topographic maps, SpO2 sensor, barometric altimeter, and 21-day battery life.</p>'
             ],
             [
                 'sku' => 'MC-CAP-TECH-01',
@@ -171,7 +177,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 250,
                 'img' => 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Gorra técnica ultraligera de 5 paneles con perforaciones láser de ventilación, banda absorbente interior y cierre elástico regulable.</p>'
+                'desc' => '<p>Ultralight 5-panel technical cap featuring laser-cut ventilation ports, moisture-wicking internal sweatband, and adjustable elastic closure.</p>'
             ],
             [
                 'sku' => 'MC-BTL-ISO-01',
@@ -183,7 +189,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 300,
                 'img' => 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Botella térmica de acero inoxidable 18/8 de doble pared al vacío. Mantiene bebidas frías durante 24 horas o calientes durante 12 horas. Libre de BPA.</p>'
+                'desc' => '<p>Vacuum-insulated double-wall 18/8 stainless steel thermal flask. Keeps beverages cold for 24 hours or hot for 12 hours. 100% BPA-free.</p>'
             ],
             // Electronics
             [
@@ -196,7 +202,7 @@ class SimpleProductSeeder
                 'special_price' => 159.99,
                 'stock' => 130,
                 'img' => 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Auriculares inalámbricos con cancelación activa de ruido híbrida de 42dB, drivers de berilio de 10mm, resistencia al agua IPX7 y 32h de autonomía.</p>'
+                'desc' => '<p>True wireless earbuds with 42dB hybrid active noise cancellation, 10mm custom beryllium drivers, IPX7 water resistance, and 32-hour total battery life.</p>'
             ],
             [
                 'sku' => 'MC-FIT-BAND-01',
@@ -208,7 +214,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 175,
                 'img' => 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Pulsera biométrica con monitor continuo de variabilidad de frecuencia cardíaca (HRV), temperatura cutánea, fases del sueño y nivel de recuperación.</p>'
+                'desc' => '<p>Continuous biometric health tracker monitoring heart rate variability (HRV), skin temperature, sleep staging, and daily recovery readiness.</p>'
             ],
             [
                 'sku' => 'MC-PWR-MAG-01',
@@ -220,7 +226,7 @@ class SimpleProductSeeder
                 'special_price' => null,
                 'stock' => 160,
                 'img' => 'https://images.unsplash.com/photo-1609592426868-b788647565df?auto=format&fit=crop&w=800&q=80',
-                'desc' => '<p>Batería externa de alta capacidad con salida Power Delivery USB-C de 65W, capaz de cargar laptops, tablets y smartphones a velocidad máxima.</p>'
+                'desc' => '<p>High-capacity 20,000mAh graphene portable power bank with 65W USB-C Power Delivery, capable of fast-charging laptops, tablets, and smartphones.</p>'
             ]
         ];
 
@@ -256,7 +262,7 @@ class SimpleProductSeeder
                     'special_price' => null,
                     'stock' => 120,
                     'img' => 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
-                    'desc' => "<p>{$name}. Diseñado para especificaciones industriales y comerciales de alta demanda. Cumple con normas ISO 9001.</p>"
+                    'desc' => "<p>{$name}. Engineered to meet rigorous commercial and industrial specifications. Fully certified under ISO 9001 compliance standards.</p>"
                 ];
             }
         }
@@ -269,7 +275,7 @@ class SimpleProductSeeder
             if ($this->createOrUpdateProduct($data, $catIds)) {
                 $count++;
                 if ($count <= 20 || $count % 500 === 0 || $count === count($catalogDefinitions)) {
-                    $log(" ✓ [{$count} / " . count($catalogDefinitions) . "] Producto: {$data['sku']} - {$data['name']}");
+                    $log(" [OK] [{$count} / " . count($catalogDefinitions) . "] Product: {$data['sku']} - {$data['name']}");
                 }
             }
         }
@@ -277,33 +283,41 @@ class SimpleProductSeeder
         return $count;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     * @param int[] $categoryIds
+     * @return bool
+     */
     public function createOrUpdateProduct(array $data, array $categoryIds): bool
     {
-        $sku = $data['sku'];
+        $sku = (string) $data['sku'];
 
         try {
             $product = $this->productRepository->get($sku);
+            if (!$product instanceof \Magento\Catalog\Model\Product) {
+                $product = $this->productFactory->create();
+            }
         } catch (\Throwable) {
             $product = $this->productFactory->create();
         }
 
         $product->setSku($sku);
-        $product->setName($data['name']);
+        $product->setName((string) $data['name']);
         $product->setTypeId(ProductType::TYPE_SIMPLE);
         $product->setAttributeSetId(4); // Default attribute set
         $product->setStatus(Status::STATUS_ENABLED);
         $product->setVisibility(Visibility::VISIBILITY_BOTH);
-        $product->setPrice($data['price']);
+        $product->setPrice((float) $data['price']);
         $product->setWeight(1.0);
-        $product->setTaxClassId(2); // Taxable Goods
-        $product->setDescription($data['desc']);
-        $product->setShortDescription(strip_tags($data['desc']));
-        $product->setUrlKey(strtolower(preg_replace('/[^a-z0-9]+/i', '-', $sku)));
+        $product->setData('tax_class_id', 2); // Taxable Goods
+        $product->setData('description', (string) $data['desc']);
+        $product->setData('short_description', strip_tags((string) $data['desc']));
+        $product->setUrlKey(strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $sku)));
 
         if (!empty($data['special_price'])) {
-            $product->setSpecialPrice($data['special_price']);
+            $product->setData('special_price', (float) $data['special_price']);
         } else {
-            $product->setSpecialPrice(null);
+            $product->setData('special_price', null);
         }
 
         // Tier Prices for B2B Customer Groups
@@ -312,7 +326,7 @@ class SimpleProductSeeder
             $tpB2b = $this->tierPriceFactory->create();
             $tpB2b->setCustomerGroupId(2); // Wholesale
             $tpB2b->setQty(1);
-            $tpB2b->setValue($data['b2b_price']);
+            $tpB2b->setValue((float) $data['b2b_price']);
             $tierPrices[] = $tpB2b;
         }
 
@@ -320,7 +334,7 @@ class SimpleProductSeeder
             $tpRetailer = $this->tierPriceFactory->create();
             $tpRetailer->setCustomerGroupId(3); // Retailer VIP
             $tpRetailer->setQty(1);
-            $tpRetailer->setValue($data['retailer_price']);
+            $tpRetailer->setValue((float) $data['retailer_price']);
             $tierPrices[] = $tpRetailer;
         }
 
@@ -333,17 +347,17 @@ class SimpleProductSeeder
 
         // Categories
         if (!empty($categoryIds)) {
-            $product->setCategoryIds($categoryIds);
+            $product->setData('category_ids', $categoryIds);
         }
 
         $savedProduct = $this->productRepository->save($product);
 
         // Update Stock Item
-        $stockItem = $this->stockRegistry->getStockItem($savedProduct->getId());
-        $stockItem->setQty($data['stock']);
-        $stockItem->setIsInStock($data['stock'] > 0);
-        $stockItem->setManageStock(1);
-        $stockItem->setUseConfigManageStock(1);
+        $stockItem = $this->stockRegistry->getStockItem((int) $savedProduct->getId());
+        $stockItem->setQty((float) $data['stock']);
+        $stockItem->setIsInStock((float) $data['stock'] > 0);
+        $stockItem->setManageStock(true);
+        $stockItem->setUseConfigManageStock(true);
         $this->stockRegistry->updateStockItemBySku($sku, $stockItem);
 
         return true;

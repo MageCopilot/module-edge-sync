@@ -7,6 +7,7 @@
                 <item name="magecopilot_seed_catalog" xsi:type="object">MageCopilot\EdgeSync\Console\Command\SeedCatalogCommand</item>
                 <item name="magecopilot_test_stock_sync" xsi:type="object">MageCopilot\EdgeSync\Console\Command\TestStockSyncCommand</item>
                 <item name="magecopilot_sku_charset_report" xsi:type="object">MageCopilot\EdgeSync\Console\Command\SkuCharsetReportCommand</item>
+                <item name="magecopilot_edgesync_feed_export" xsi:type="object">MageCopilot\EdgeSync\Console\Command\ExportFeedCommand</item>
             </argument>
         </arguments>
     </type>
@@ -15,6 +16,20 @@
     <type name="Magento\InventorySalesApi\Api\PlaceReservationsForSalesEventInterface">
         <plugin name="magecopilot_inventory_reservation_sync_plugin"
                 type="MageCopilot\EdgeSync\Plugin\InventoryReservationSyncPlugin"
+                sortOrder="100"/>
+    </type>
+
+    <!-- Plugin to capture MSI source item saves from admin or ERP -->
+    <type name="Magento\InventoryApi\Api\SourceItemsSaveInterface">
+        <plugin name="magecopilot_source_items_save_sync_plugin"
+                type="MageCopilot\EdgeSync\Plugin\SourceItemsSaveSyncPlugin"
+                sortOrder="100"/>
+    </type>
+
+    <!-- Plugin to capture product deletions and propagate delta purge to Typesense RAM -->
+    <type name="Magento\Catalog\Model\ResourceModel\Product">
+        <plugin name="magecopilot_product_delete_sync_plugin"
+                type="MageCopilot\EdgeSync\Plugin\ProductDeleteSyncPlugin"
                 sortOrder="100"/>
     </type>
 </config>

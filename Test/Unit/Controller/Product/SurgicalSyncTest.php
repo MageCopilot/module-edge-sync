@@ -151,7 +151,7 @@ class SurgicalSyncTest extends TestCase
             ->with($this->callback(function (array $data) {
                 return $data['success'] === true
                     && $data['purged'] === true
-                    && str_contains($data['message'], 'Purga quirúrgica');
+                    && str_contains($data['message'], 'Surgical purge');
             }));
 
         $this->controller->execute();

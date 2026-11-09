@@ -1,7 +1,20 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework-message-queue:etc/topology.xsd">
-    <exchange name="magento">
-        <binding id="MageCopilotTypesenseStockSyncBinding" topic="magecopilot.inventory.stock_update" destination="magecopilot_typesense_stock_sync" destinationType="queue"/>
-        <binding id="MageCopilotTypesenseProductSyncBinding" topic="magecopilot.edgesync.product" destination="magecopilot_typesense_product_sync" destinationType="queue"/>
+    <exchange name="magento" type="topic" connection="amqp">
+        <binding id="MageCopilotTypesenseStockSyncBinding" topic="magecopilot.inventory.stock_update" destination="magecopilot_typesense_stock_sync" destinationType="queue">
+            <arguments>
+                <argument name="x-dead-letter-exchange" xsi:type="string">magecopilot.dlx</argument>
+                <argument name="x-dead-letter-routing-key" xsi:type="string">magecopilot.dlq</argument>
+            </arguments>
+        </binding>
+        <binding id="MageCopilotTypesenseProductSyncBinding" topic="magecopilot.edgesync.product" destination="magecopilot_typesense_product_sync" destinationType="queue">
+            <arguments>
+                <argument name="x-dead-letter-exchange" xsi:type="string">magecopilot.dlx</argument>
+                <argument name="x-dead-letter-routing-key" xsi:type="string">magecopilot.dlq</argument>
+            </arguments>
+        </binding>
+    </exchange>
+    <exchange name="magecopilot.dlx" type="topic" connection="amqp">
+        <binding id="MageCopilotDeadLetterBinding" topic="magecopilot.dlq" destination="magecopilot_typesense_sync_dlq" destinationType="queue"/>
     </exchange>
 </config>

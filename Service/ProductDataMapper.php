@@ -3,22 +3,25 @@ declare(strict_types=1);
 
 namespace MageCopilot\EdgeSync\Service;
 
+use Magento\Bundle\Model\Product\Type as BundleType;
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
-use Magento\Framework\UrlInterface;
-use Magento\InventorySalesApi\Api\GetProductSalableQtyInterface;
-use Magento\InventorySalesApi\Api\IsProductSalableInterface;
-use Magento\Store\Model\StoreManagerInterface;
 use Magento\ConfigurableProduct\Model\Product\Type\Configurable as ConfigurableType;
-use Magento\Bundle\Model\Product\Type as BundleType;
-use Magento\Framework\App\ResourceConnection;
-use MageCopilot\EdgeSync\Model\Config;
-use MageCopilot\EdgeSync\Service\CurrencyRateResolver;
-use MageCopilot\EdgeSync\Service\CatalogRulePriceResolver;
 use Magento\Customer\Api\GroupRepositoryInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\DataObject;
+use Magento\Framework\UrlInterface;
+use Magento\GroupedProduct\Model\Product\Type\Grouped as GroupedType;
+use Magento\InventorySalesApi\Api\Data\SalesChannelInterface;
+use Magento\InventorySalesApi\Api\GetProductSalableQtyInterface;
+use Magento\InventorySalesApi\Api\IsProductSalableInterface;
+use Magento\InventorySalesApi\Api\StockResolverInterface;
+use Magento\Store\Model\Store;
+use Magento\Store\Model\StoreManagerInterface;
+use MageCopilot\EdgeSync\Model\Config;
 use Psr\Log\LoggerInterface;
 
 class ProductDataMapper
@@ -26,6 +29,18 @@ class ProductDataMapper
     /** @var array<int, array{name: string, url_key: string}> */
     private array $categoryCache = [];
     private ?string $mediaBaseUrl = null;
+
+    /** @var array<int, string> */
+    private array $swatchCache = [];
+
+    /** @var array<string, string> */
+    private array $productNameCache = [];
+
+    /** @var array<string, int> */
+    private array $attributeIdCache = [];
+
+    /** @var int[]|null */
+    private ?array $customerGroupIdsCache = null;
 
     public function __construct(
         private CategoryCollectionFactory $categoryCollectionFactory,
@@ -40,7 +55,8 @@ class ProductDataMapper
         private ?CurrencyRateResolver $currencyRateResolver = null,
         private ?CatalogRulePriceResolver $catalogRulePriceResolver = null,
         private ?GroupRepositoryInterface $groupRepository = null,
-        private ?SearchCriteriaBuilder $searchCriteriaBuilder = null
+        private ?SearchCriteriaBuilder $searchCriteriaBuilder = null,
+        private ?StockResolverInterface $stockResolver = null
     ) {
     }
 
@@ -57,8 +73,10 @@ class ProductDataMapper
 
         $sku = (string) $product->getSku();
         $price = (float) $product->getPrice();
-        $specialPrice = $product->getSpecialPrice() !== null ? (float) $product->getSpecialPrice() : null;
-        $typeId = is_string($product->getTypeId()) ? $product->getTypeId() : (string) ($product->getData('type_id') ?: 'simple');
+        $specialPriceRaw = $product->getSpecialPrice();
+        $specialPrice = ($specialPriceRaw > 0) ? (float) $specialPriceRaw : null;
+        $typeIdRaw = $product->getTypeId();
+        $typeId = is_array($typeIdRaw) ? (string) reset($typeIdRaw) : (string) ($typeIdRaw ?: 'simple');
 
         // Check if special price is currently valid
         if ($specialPrice !== null) {
@@ -75,7 +93,8 @@ class ProductDataMapper
 
         $websiteId = 1;
         try {
-            $websiteId = (int) ($this->storeManager->getStore()->getWebsiteId() ?: 1);
+            $store = $this->storeManager->getStore();
+            $websiteId = (int) ($store->getWebsiteId() ?: 1);
         } catch (\Throwable) {
             // fallback
         }
@@ -95,7 +114,7 @@ class ProductDataMapper
         $groupPricesList = $resolvedGroupPrices['list'];
 
         // Categories
-        $categoryIds = array_map('intval', $product->getCategoryIds() ?? []);
+        $categoryIds = array_map('intval', (array) $product->getCategoryIds());
         $categoryNames = [];
         $categorySlugs = [];
 
@@ -107,7 +126,7 @@ class ProductDataMapper
         }
 
         // Stock & Inventory (MSI with fallback)
-        [$isInStock, $qty] = $this->resolveStock($sku, (int)$product->getId());
+        [$isInStock, $qty] = $this->resolveStock($sku, (int)$product->getId(), $websiteId);
 
         // Images
         $mainImage = $product->getImage();
@@ -128,14 +147,6 @@ class ProductDataMapper
             $galleryImages[] = $imageUrl;
         }
 
-        // High-res curated image fallbacks for flagship items
-        if (empty($imageUrl)) {
-            $imageUrl = $this->resolveCuratedImage($sku, (string)$product->getName());
-            if (!empty($imageUrl)) {
-                $galleryImages = $this->resolveCuratedGallery($sku, $imageUrl);
-            }
-        }
-
         // Filterable custom attributes
         $color = $this->getAttributeText($product, 'color');
         $size = $this->getAttributeText($product, 'size');
@@ -143,13 +154,16 @@ class ProductDataMapper
 
         $urlKey = (string) ($product->getUrlKey() ?: strtolower(preg_replace('/[^a-z0-9]+/i', '-', (string)$product->getName())));
 
-        // Complex Catalog (Sprint 5 additions)
+        // Complex Catalog Product Types
         $configurableOptions = null;
         $variants = null;
         $bundleOptions = null;
+        $groupedItems = null;
+        $minPrice = null;
+        $maxPrice = null;
 
         if ($typeId === ConfigurableType::TYPE_CODE) {
-            $configData = $this->resolveConfigurableData($product, $websiteId);
+            $configData = $this->resolveConfigurableData($product, $websiteId, $imageUrl);
             if ($configData) {
                 $configurableOptions = $configData['configurable_options'];
                 $variants = $configData['variants'];
@@ -157,23 +171,66 @@ class ProductDataMapper
                     $price = $configData['min_price'];
                     $effectivePrice = $price;
                 }
+                $minPrice = $configData['min_price'];
+                $maxPrice = $configData['max_price'];
                 $isInStock = $configData['is_in_stock'];
                 $qty = $configData['salable_qty'];
             }
         } elseif ($typeId === BundleType::TYPE_CODE) {
-            $bundleData = $this->resolveBundleData($product);
+            $bundleData = $this->resolveBundleData($product, $websiteId, $imageUrl);
             if ($bundleData) {
                 $bundleOptions = $bundleData['bundle_options'];
-                $isInStock = true;
-                $qty = 50.0;
+                $isInStock = $bundleData['is_in_stock'];
+                $qty = $bundleData['salable_qty'];
+                if ($bundleData['min_price'] > 0) {
+                    $price = $bundleData['min_price'];
+                    $effectivePrice = $price;
+                }
+                $minPrice = $bundleData['min_price'];
+                $maxPrice = $bundleData['max_price'];
+            }
+        } elseif ($typeId === GroupedType::TYPE_CODE || $typeId === 'grouped') {
+            $groupedData = $this->resolveGroupedData($product, $websiteId, $imageUrl);
+            if ($groupedData) {
+                $groupedItems = $groupedData['grouped_items'];
+                $isInStock = $groupedData['is_in_stock'];
+                $qty = $groupedData['salable_qty'];
+                if ($groupedData['min_price'] > 0) {
+                    $price = $groupedData['min_price'];
+                    $effectivePrice = $price;
+                }
+                $minPrice = $groupedData['min_price'];
+                $maxPrice = $groupedData['max_price'];
             }
         }
 
         $linked = $this->resolveLinkedProducts($product);
 
+        // Dynamic store assignments
+        $storeIds = [];
+        $storeCodes = [];
+        try {
+            $websiteIds = array_map('intval', (array) $product->getWebsiteIds());
+            if (empty($websiteIds)) {
+                $websiteIds = [$websiteId];
+            }
+            foreach ($this->storeManager->getStores() as $store) {
+                if (in_array((int) $store->getWebsiteId(), $websiteIds, true)) {
+                    $storeIds[] = (int) $store->getId();
+                    $storeCodes[] = (string) $store->getCode();
+                }
+            }
+        } catch (\Throwable) {
+            $storeIds = [1];
+            $storeCodes = ['default'];
+        }
+
         $baseCurrency = 'USD';
         try {
-            $baseCurrency = (string) ($this->storeManager->getStore()->getBaseCurrencyCode() ?: 'USD');
+            $store = $this->storeManager->getStore();
+            if ($store instanceof Store) {
+                $baseCurrency = (string) ($store->getBaseCurrencyCode() ?: 'USD');
+            }
         } catch (\Throwable) {
             // fallback
         }
@@ -210,8 +267,8 @@ class ProductDataMapper
             'price_group_1' => $groupPrices[1] ?? $effectivePrice,
             'price_group_2' => $groupPrices[2] ?? $effectivePrice,
             'price_group_3' => $groupPrices[3] ?? $effectivePrice,
-            'store_ids' => [1, 2, 3],
-            'stores' => ['default', 'es', 'pt'],
+            'store_ids' => array_values(array_unique($storeIds)),
+            'stores' => array_values(array_unique($storeCodes)),
             'category_ids' => array_values(array_unique($categoryIds)),
             'category_names' => array_values(array_unique($categoryNames)),
             'category_slugs' => array_values(array_unique($categorySlugs)),
@@ -226,6 +283,33 @@ class ProductDataMapper
             'created_at' => strtotime((string) $product->getCreatedAt()) ?: time()
         ];
 
+        // Format and append tier prices if present
+        $rawTierPrices = $product->getTierPrices();
+        if (is_array($rawTierPrices) && !empty($rawTierPrices)) {
+            $formattedTierPrices = [];
+            foreach ($rawTierPrices as $tp) {
+                $percentage = null;
+                if ($tp instanceof DataObject && $tp->hasData('percentage')) {
+                    $percentage = (float) $tp->getData('percentage');
+                }
+                $formattedTierPrices[] = [
+                    'customer_group_id' => (int) $tp->getCustomerGroupId(),
+                    'qty' => (float) $tp->getQty(),
+                    'value' => (float) $tp->getValue(),
+                    'percentage' => $percentage
+                ];
+            }
+            if ($formattedTierPrices !== []) {
+                $doc['tier_prices'] = $formattedTierPrices;
+            }
+        }
+
+        if ($minPrice !== null) {
+            $doc['min_price'] = (float) round($minPrice, 2);
+        }
+        if ($maxPrice !== null) {
+            $doc['max_price'] = (float) round($maxPrice, 2);
+        }
         if ($configurableOptions !== null) {
             $doc['configurable_options'] = $configurableOptions;
         }
@@ -234,6 +318,9 @@ class ProductDataMapper
         }
         if ($bundleOptions !== null) {
             $doc['bundle_options'] = $bundleOptions;
+        }
+        if ($groupedItems !== null) {
+            $doc['grouped_items'] = $groupedItems;
         }
         if (!empty($linked['cross_sell_skus'])) {
             $doc['cross_sell_skus'] = $linked['cross_sell_skus'];
@@ -263,9 +350,11 @@ class ProductDataMapper
 
     /**
      * @param Product $product
+     * @param int $websiteId
+     * @param string $parentImageUrl
      * @return array<string, mixed>|null
      */
-    private function resolveConfigurableData(Product $product, int $websiteId = 1): ?array
+    private function resolveConfigurableData(Product $product, int $websiteId = 1, string $parentImageUrl = ''): ?array
     {
         try {
             $typeInstance = $product->getTypeInstance();
@@ -278,9 +367,6 @@ class ProductDataMapper
 
             foreach ($attributes as $attr) {
                 $productAttr = $attr->getProductAttribute();
-                if (!$productAttr) {
-                    continue;
-                }
                 $attrId = (int) $attr->getAttributeId();
                 $code = (string) $productAttr->getAttributeCode();
                 $label = (string) ($attr->getLabel() ?: $productAttr->getData('frontend_label') ?: $code);
@@ -299,7 +385,8 @@ class ProductDataMapper
             $variants = [];
             $hasSalableStock = false;
             $totalSalableQty = 0.0;
-            $minPrice = (float) $product->getPrice();
+            $minPrice = 0.0;
+            $maxPrice = 0.0;
 
             // Populate option values from child variants
             $optionValuesMap = []; // code => [valIndex => ['label' => ..., 'swatch' => ...]]
@@ -308,7 +395,7 @@ class ProductDataMapper
                 /** @var Product $child */
                 $childSku = (string) $child->getSku();
                 $childId = (int) $child->getId();
-                [$childInStock, $childQty] = $this->resolveStock($childSku, $childId);
+                [$childInStock, $childQty] = $this->resolveStock($childSku, $childId, $websiteId);
 
                 if ($childInStock && $childQty > 0) {
                     $hasSalableStock = true;
@@ -318,8 +405,14 @@ class ProductDataMapper
                 $childPrice = (float) ($child->getPrice() ?: $product->getPrice());
                 $childSpecial = $child->getData('special_price') !== null ? (float) $child->getData('special_price') : null;
                 $childEffective = ($childSpecial !== null && $childSpecial < $childPrice) ? $childSpecial : $childPrice;
-                if ($childEffective > 0 && ($minPrice <= 0 || $childEffective < $minPrice)) {
-                    $minPrice = $childEffective;
+
+                if ($childEffective > 0) {
+                    if ($minPrice <= 0 || $childEffective < $minPrice) {
+                        $minPrice = $childEffective;
+                    }
+                    if ($childEffective > $maxPrice) {
+                        $maxPrice = $childEffective;
+                    }
                 }
 
                 $childResolved = $this->resolveCustomerGroupPrices($child, $childEffective, (int)$child->getId(), $websiteId);
@@ -351,9 +444,24 @@ class ProductDataMapper
                     }
                 }
 
-                // Child images with color matching
-                $childColorLabel = $attributeLabels['color'] ?? '';
-                $childImgUrl = $this->resolveVariantImage($childSku, $childColorLabel);
+                // Child images: use child image if present, fallback to parent main image
+                $childImage = $child->getImage();
+                $childImgUrl = ($childImage && $childImage !== 'no_selection')
+                    ? $this->mediaBaseUrl . 'catalog/product' . $childImage
+                    : $parentImageUrl;
+
+                $childGallery = [];
+                $childMediaEntries = $child->getMediaGalleryEntries();
+                if (!empty($childMediaEntries)) {
+                    foreach ($childMediaEntries as $entry) {
+                        if ($entry->getFile()) {
+                            $childGallery[] = $this->mediaBaseUrl . 'catalog/product' . $entry->getFile();
+                        }
+                    }
+                }
+                if (empty($childGallery) && !empty($childImgUrl)) {
+                    $childGallery[] = $childImgUrl;
+                }
 
                 $variants[] = [
                     'id' => (string) $childId,
@@ -367,7 +475,7 @@ class ProductDataMapper
                     'is_in_stock' => $childInStock,
                     'salable_qty' => (float) $childQty,
                     'image_url' => $childImgUrl,
-                    'images' => [$childImgUrl],
+                    'images' => $childGallery,
                     'attributes' => $attributesMap,
                     'attribute_labels' => $attributeLabels,
                     'selected_options' => $selectedOptions
@@ -388,7 +496,8 @@ class ProductDataMapper
                 'variants' => $variants,
                 'is_in_stock' => $hasSalableStock,
                 'salable_qty' => $totalSalableQty,
-                'min_price' => $minPrice
+                'min_price' => $minPrice,
+                'max_price' => $maxPrice > 0 ? $maxPrice : $minPrice
             ];
         } catch (\Throwable $e) {
             $this->logger->error('[MageCopilot_EdgeSync] Error resolving configurable data: ' . $e->getMessage());
@@ -398,67 +507,227 @@ class ProductDataMapper
 
     /**
      * @param Product $product
+     * @param int $websiteId
+     * @param string $parentImageUrl
      * @return array<string, mixed>|null
      */
-    private function resolveBundleData(Product $product): ?array
+    private function resolveBundleData(Product $product, int $websiteId = 1, string $parentImageUrl = ''): ?array
     {
+        if ($this->resourceConnection === null) {
+            return null;
+        }
+
         try {
-            if ($this->resourceConnection === null) {
-                $this->resourceConnection = \Magento\Framework\App\ObjectManager::getInstance()->get(
-                    ResourceConnection::class
-                );
-            }
             $conn = $this->resourceConnection->getConnection();
             $parentId = (int) $product->getId();
 
-            $rows = $conn->fetchAll("
-                SELECT o.option_id, ov.title, o.type, o.required, o.position,
-                       s.selection_id, s.product_id, p.sku, s.is_default, s.selection_price_value, s.selection_qty, s.selection_can_change_qty
-                FROM catalog_product_bundle_option o
-                JOIN catalog_product_bundle_option_value ov ON o.option_id = ov.option_id AND ov.store_id = 0
-                JOIN catalog_product_bundle_selection s ON o.option_id = s.option_id
-                JOIN catalog_product_entity p ON s.product_id = p.entity_id
-                WHERE o.parent_id = :parentId
-                ORDER BY o.position ASC, s.position ASC
-            ", ['parentId' => $parentId]);
+            $optionTable = $this->resourceConnection->getTableName('catalog_product_bundle_option');
+            $optionValTable = $this->resourceConnection->getTableName('catalog_product_bundle_option_value');
+            $selectionTable = $this->resourceConnection->getTableName('catalog_product_bundle_selection');
+            $entityTable = $this->resourceConnection->getTableName('catalog_product_entity');
 
+            $select = $conn->select()
+                ->from(['o' => $optionTable], ['option_id', 'type', 'required', 'position'])
+                ->join(['ov' => $optionValTable], 'o.option_id = ov.option_id AND ov.store_id = 0', ['title'])
+                ->join(['s' => $selectionTable], 'o.option_id = s.option_id', [
+                    'selection_id', 'product_id', 'is_default', 'selection_price_value', 'selection_qty', 'selection_can_change_qty'
+                ])
+                ->join(['p' => $entityTable], 's.product_id = p.entity_id', ['sku'])
+                ->where('o.parent_id = ?', $parentId)
+                ->order(['o.position ASC', 's.position ASC']);
+
+            $rows = $conn->fetchAll($select);
             if (empty($rows)) {
                 return null;
             }
 
             $optionsMap = [];
+            $requiredOptionsSalable = []; // optId => bool
+            $optionMaxUnits = []; // optId => float
+
             foreach ($rows as $r) {
                 $optId = (int) $r['option_id'];
+                $isRequired = (bool) $r['required'];
+
                 if (!isset($optionsMap[$optId])) {
                     $optionsMap[$optId] = [
                         'option_id' => $optId,
                         'title' => (string) $r['title'],
                         'type' => (string) $r['type'],
-                        'required' => (bool) $r['required'],
+                        'required' => $isRequired,
                         'position' => (int) $r['position'],
                         'selections' => []
                     ];
+                    if ($isRequired) {
+                        $requiredOptionsSalable[$optId] = false;
+                        $optionMaxUnits[$optId] = 0.0;
+                    }
                 }
 
+                $childId = (int) $r['product_id'];
                 $childSku = (string) $r['sku'];
-                $childName = $this->resolveProductNameBySku($childSku);
+                $childName = $this->resolveProductName($childId, $childSku);
+                $selectionQty = (float) ($r['selection_qty'] ?: 1.0);
+
+                [$childInStock, $childQty] = $this->resolveStock($childSku, $childId, $websiteId);
+                $isSelectionSalable = ($childInStock && $childQty >= $selectionQty);
+
+                if ($isRequired && $isSelectionSalable) {
+                    $requiredOptionsSalable[$optId] = true;
+                    $unitsForSelection = floor($childQty / max(1.0, $selectionQty));
+                    $optionMaxUnits[$optId] = max($optionMaxUnits[$optId], $unitsForSelection);
+                }
+
+                $selectionImgUrl = $this->resolveProductImage($childId, $parentImageUrl);
 
                 $optionsMap[$optId]['selections'][] = [
                     'selection_id' => (int) $r['selection_id'],
-                    'product_id' => (int) $r['product_id'],
+                    'product_id' => $childId,
                     'sku' => $childSku,
                     'name' => $childName,
                     'price' => (float) $r['selection_price_value'],
-                    'qty' => (float) ($r['selection_qty'] ?: 1),
+                    'qty' => $selectionQty,
                     'can_change_qty' => (bool) $r['selection_can_change_qty'],
                     'is_default' => (bool) $r['is_default'],
-                    'image_url' => $this->resolveCuratedImage($childSku, $childName)
+                    'is_in_stock' => $childInStock,
+                    'salable_qty' => (float) $childQty,
+                    'image_url' => $selectionImgUrl
                 ];
             }
 
-            return ['bundle_options' => array_values($optionsMap)];
+            // Real Bundle Stock Availability check
+            $bundleInStock = true;
+            foreach ($requiredOptionsSalable as $optId => $salable) {
+                if (!$salable) {
+                    $bundleInStock = false;
+                    break;
+                }
+            }
+
+            $bundleSalableQty = 0.0;
+            if ($bundleInStock) {
+                if (!empty($optionMaxUnits)) {
+                    $bundleSalableQty = (float) min(array_values($optionMaxUnits));
+                } else {
+                    $bundleSalableQty = 100.0; // Bundle with only optional items
+                }
+            }
+
+            // Real Bundle Pricing
+            $basePrice = (float) $product->getPrice();
+            $minPrice = $basePrice;
+            $maxPrice = $basePrice;
+
+            foreach ($optionsMap as $opt) {
+                $prices = array_map(fn($s) => (float) $s['price'], $opt['selections']);
+                $minSel = min($prices);
+                $maxSel = max($prices);
+
+                if ($opt['required']) {
+                    $minPrice += $minSel;
+                }
+                $maxPrice += $maxSel;
+            }
+
+            return [
+                'bundle_options' => array_values($optionsMap),
+                'is_in_stock' => $bundleInStock,
+                'salable_qty' => $bundleSalableQty,
+                'min_price' => (float) round($minPrice, 2),
+                'max_price' => (float) round($maxPrice, 2)
+            ];
         } catch (\Throwable $e) {
             $this->logger->error('[MageCopilot_EdgeSync] Error resolving bundle data: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * @param Product $product
+     * @param int $websiteId
+     * @param string $parentImageUrl
+     * @return array<string, mixed>|null
+     */
+    private function resolveGroupedData(Product $product, int $websiteId = 1, string $parentImageUrl = ''): ?array
+    {
+        if ($this->resourceConnection === null) {
+            return null;
+        }
+
+        try {
+            $conn = $this->resourceConnection->getConnection();
+            $parentId = (int) $product->getId();
+
+            $linkTable = $this->resourceConnection->getTableName('catalog_product_link');
+            $entityTable = $this->resourceConnection->getTableName('catalog_product_entity');
+
+            $select = $conn->select()
+                ->from(['l' => $linkTable], ['link_id', 'linked_product_id'])
+                ->join(['p' => $entityTable], 'l.linked_product_id = p.entity_id', ['sku'])
+                ->where('l.product_id = ?', $parentId)
+                ->where('l.link_type_id = ?', 3) // LINK_TYPE_GROUPED = 3
+                ->order('l.link_id ASC');
+
+            $rows = $conn->fetchAll($select);
+            if (empty($rows)) {
+                return null;
+            }
+
+            $groupedItems = [];
+            $hasSalableStock = false;
+            $totalSalableQty = 0.0;
+            $minPrice = 0.0;
+            $maxPrice = 0.0;
+
+            foreach ($rows as $row) {
+                $childId = (int) $row['linked_product_id'];
+                $childSku = (string) $row['sku'];
+                $childName = $this->resolveProductName($childId, $childSku);
+
+                [$childInStock, $childQty] = $this->resolveStock($childSku, $childId, $websiteId);
+                if ($childInStock && $childQty > 0) {
+                    $hasSalableStock = true;
+                    $totalSalableQty += $childQty;
+                }
+
+                $childPrice = $this->getProductDecimalAttribute($childId, 'price') ?? 0.0;
+                $childSpecialPrice = $this->getProductDecimalAttribute($childId, 'special_price');
+                $effectiveChildPrice = ($childSpecialPrice !== null && $childSpecialPrice > 0 && $childSpecialPrice < $childPrice)
+                    ? $childSpecialPrice
+                    : $childPrice;
+
+                if ($effectiveChildPrice > 0) {
+                    if ($minPrice <= 0 || $effectiveChildPrice < $minPrice) {
+                        $minPrice = $effectiveChildPrice;
+                    }
+                    if ($effectiveChildPrice > $maxPrice) {
+                        $maxPrice = $effectiveChildPrice;
+                    }
+                }
+
+                $childImgUrl = $this->resolveProductImage($childId, $parentImageUrl);
+
+                $groupedItems[] = [
+                    'id' => (string) $childId,
+                    'sku' => $childSku,
+                    'name' => $childName,
+                    'price' => (float) $childPrice,
+                    'special_price' => $childSpecialPrice !== null ? (float) $childSpecialPrice : null,
+                    'is_in_stock' => $childInStock,
+                    'salable_qty' => (float) $childQty,
+                    'image_url' => $childImgUrl
+                ];
+            }
+
+            return [
+                'grouped_items' => $groupedItems,
+                'is_in_stock' => $hasSalableStock,
+                'salable_qty' => $totalSalableQty,
+                'min_price' => $minPrice,
+                'max_price' => $maxPrice > 0 ? $maxPrice : $minPrice
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->error('[MageCopilot_EdgeSync] Error resolving grouped data: ' . $e->getMessage());
             return null;
         }
     }
@@ -472,21 +741,23 @@ class ProductDataMapper
         $crossSellSkus = [];
         $upSellSkus = [];
 
+        if ($this->resourceConnection === null) {
+            return ['cross_sell_skus' => [], 'up_sell_skus' => []];
+        }
+
         try {
-            if ($this->resourceConnection === null) {
-                $this->resourceConnection = \Magento\Framework\App\ObjectManager::getInstance()->get(
-                    ResourceConnection::class
-                );
-            }
             $conn = $this->resourceConnection->getConnection();
             $productId = (int) $product->getId();
 
-            $links = $conn->fetchAll("
-                SELECT l.link_type_id, p.sku 
-                FROM catalog_product_link l
-                JOIN catalog_product_entity p ON l.linked_product_id = p.entity_id
-                WHERE l.product_id = :pid
-            ", ['pid' => $productId]);
+            $linkTable = $this->resourceConnection->getTableName('catalog_product_link');
+            $entityTable = $this->resourceConnection->getTableName('catalog_product_entity');
+
+            $select = $conn->select()
+                ->from(['l' => $linkTable], ['link_type_id'])
+                ->join(['p' => $entityTable], 'l.linked_product_id = p.entity_id', ['sku'])
+                ->where('l.product_id = ?', $productId);
+
+            $links = $conn->fetchAll($select);
 
             foreach ($links as $row) {
                 if ((int) $row['link_type_id'] === 5) {
@@ -496,7 +767,7 @@ class ProductDataMapper
                 }
             }
         } catch (\Throwable) {
-
+            // fallback
         }
 
         return [
@@ -505,125 +776,177 @@ class ProductDataMapper
         ];
     }
 
-    private function resolveProductNameBySku(string $sku): string
-    {
-        $names = [
-            'MC-BAG-NOMAD-28' => 'Urban Stealth Commuter Backpack 28L',
-            'MC-TS-ORGANIC-WHT' => 'Supima Cotton Minimalist Tee White',
-            'MC-HD-BLK-01' => 'Apex Hybrid Performance Hoodie Black',
-            'MC-FLASK-VACUUM-750' => 'HydroPure Thermal Insulated Flask 750ml'
-        ];
-        return $names[$sku] ?? $sku;
-    }
-
-    private function resolveCuratedImage(string $sku, string $name): string
-    {
-        $skuUpper = strtoupper($sku);
-        if (str_contains($skuUpper, 'HOOD') || str_contains($skuUpper, 'HD')) {
-            return 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=85';
-        }
-        if (str_contains($skuUpper, 'SNK') || str_contains($skuUpper, 'SHOE')) {
-            return 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=85';
-        }
-        if (str_contains($skuUpper, 'BAG') || str_contains($skuUpper, 'BP') || str_contains($skuUpper, 'BUNDLE')) {
-            return 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1000&q=85';
-        }
-        if (str_contains($skuUpper, 'TS-') || str_contains($skuUpper, 'TEE')) {
-            return 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=85';
-        }
-        if (str_contains($skuUpper, 'FLASK')) {
-            return 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=1000&q=85';
-        }
-        return 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=85';
-    }
-
-    /**
-     * @param string $sku
-     * @param string $main
-     * @return list<string>
-     */
-    private function resolveCuratedGallery(string $sku, string $main): array
-    {
-        $gallery = [$main];
-        $skuUpper = strtoupper($sku);
-        if (str_contains($skuUpper, 'HOOD')) {
-            $gallery[] = 'https://images.unsplash.com/photo-1578587018452-892bacefd3f2?auto=format&fit=crop&w=1000&q=85';
-            $gallery[] = 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1000&q=85';
-        } elseif (str_contains($skuUpper, 'SNK')) {
-            $gallery[] = 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=1000&q=85';
-            $gallery[] = 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=1000&q=85';
-        } elseif (str_contains($skuUpper, 'BUNDLE')) {
-            $gallery[] = 'https://images.unsplash.com/photo-1546938576-6e6a64f317cc?auto=format&fit=crop&w=1000&q=85';
-            $gallery[] = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=85';
-        }
-        return $gallery;
-    }
-
-    private function resolveVariantImage(string $sku, string $colorLabel): string
-    {
-        $colorLower = strtolower($colorLabel);
-        if (str_contains($colorLower, 'negro') || str_contains($colorLower, 'black')) {
-            return 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=85';
-        }
-        if (str_contains($colorLower, 'azul') || str_contains($colorLower, 'navy')) {
-            return 'https://images.unsplash.com/photo-1578587018452-892bacefd3f2?auto=format&fit=crop&w=1000&q=85';
-        }
-        if (str_contains($colorLower, 'verde') || str_contains($colorLower, 'olive')) {
-            return 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1000&q=85';
-        }
-        if (str_contains($colorLower, 'blanco') || str_contains($colorLower, 'white')) {
-            return 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=85';
-        }
-        if (str_contains($colorLower, 'rojo') || str_contains($colorLower, 'red') || str_contains($colorLower, 'carmesí')) {
-            return 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=85';
-        }
-        return 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=85';
-    }
-
     private function resolveSwatchValue(int $optionId, string $label, string $attributeCode): string
     {
         if ($attributeCode !== 'color') {
             return $label;
         }
 
+        if (isset($this->swatchCache[$optionId])) {
+            return $this->swatchCache[$optionId];
+        }
+
+        if ($this->resourceConnection !== null && $optionId > 0) {
+            try {
+                $conn = $this->resourceConnection->getConnection();
+                $tableName = $this->resourceConnection->getTableName('eav_attribute_option_swatch');
+                $select = $conn->select()
+                    ->from($tableName, ['value', 'type'])
+                    ->where('option_id = ?', $optionId)
+                    ->order('store_id DESC')
+                    ->limit(1);
+                $row = $conn->fetchRow($select);
+                if ($row && !empty($row['value'])) {
+                    $swatchVal = (string) $row['value'];
+                    if (str_starts_with($swatchVal, '#')) {
+                        return $this->swatchCache[$optionId] = $swatchVal;
+                    }
+                    if ((int) $row['type'] === 1 && preg_match('/^[a-f0-9]{3,6}$/i', $swatchVal)) {
+                        return $this->swatchCache[$optionId] = '#' . $swatchVal;
+                    }
+                }
+            } catch (\Throwable) {
+                // fallback to color map
+            }
+        }
+
         $colorMap = [
             'black' => '#111827',
-            'negro' => '#111827',
             'white' => '#f8fafc',
-            'blanco' => '#f8fafc',
             'navy' => '#1e3a8a',
-            'azul' => '#2563eb',
             'blue' => '#2563eb',
             'olive' => '#365314',
-            'verde' => '#15803d',
             'green' => '#15803d',
             'red' => '#dc2626',
-            'rojo' => '#dc2626',
             'crimson' => '#991b1b',
             'grey' => '#64748b',
             'gray' => '#64748b',
-            'gris' => '#64748b',
             'amber' => '#d97706',
             'yellow' => '#eab308',
-            'amarillo' => '#eab308',
             'purple' => '#7c3aed',
-            'morado' => '#7c3aed',
-            'orange' => '#ea580c',
-            'naranja' => '#ea580c'
+            'orange' => '#ea580c'
         ];
 
         $cleanLabel = strtolower(trim($label));
         foreach ($colorMap as $k => $hex) {
             if (str_contains($cleanLabel, $k)) {
-                return $hex;
+                return $this->swatchCache[$optionId] = $hex;
             }
         }
 
-        return '#4b5563';
+        return $this->swatchCache[$optionId] = '#4b5563';
     }
 
-    /** @var int[]|null */
-    private ?array $customerGroupIdsCache = null;
+    /**
+     * Resolve child product name dynamically from catalog EAV tables with SKU fallback.
+     */
+    private function resolveProductName(int $productId, string $sku): string
+    {
+        if (isset($this->productNameCache[$sku])) {
+            return $this->productNameCache[$sku];
+        }
+
+        $name = $this->getProductVarcharAttribute($productId, 'name');
+        if ($name && trim($name) !== '') {
+            return $this->productNameCache[$sku] = trim($name);
+        }
+
+        return $this->productNameCache[$sku] = $sku;
+    }
+
+    /**
+     * Resolve product image URL from catalog EAV tables.
+     */
+    private function resolveProductImage(int $productId, string $fallbackUrl = ''): string
+    {
+        $imageFile = $this->getProductVarcharAttribute($productId, 'image');
+        if ($imageFile && $imageFile !== 'no_selection') {
+            return $this->mediaBaseUrl . 'catalog/product' . $imageFile;
+        }
+        return $fallbackUrl;
+    }
+
+    private function getAttributeId(string $attributeCode, string $backendType): ?int
+    {
+        $key = "{$attributeCode}_{$backendType}";
+        if (isset($this->attributeIdCache[$key])) {
+            return $this->attributeIdCache[$key];
+        }
+
+        if ($this->resourceConnection === null) {
+            return null;
+        }
+
+        try {
+            $conn = $this->resourceConnection->getConnection();
+            $select = $conn->select()
+                ->from($this->resourceConnection->getTableName('eav_attribute'), ['attribute_id'])
+                ->where('attribute_code = ?', $attributeCode)
+                ->where('backend_type = ?', $backendType)
+                ->where('entity_type_id = ?', 4)
+                ->limit(1);
+            $attrId = $conn->fetchOne($select);
+            if ($attrId) {
+                return $this->attributeIdCache[$key] = (int) $attrId;
+            }
+        } catch (\Throwable) {
+            // fallback
+        }
+
+        return null;
+    }
+
+    private function getProductVarcharAttribute(int $productId, string $attributeCode): ?string
+    {
+        $attrId = $this->getAttributeId($attributeCode, 'varchar');
+        if (!$attrId || $this->resourceConnection === null) {
+            return null;
+        }
+
+        try {
+            $conn = $this->resourceConnection->getConnection();
+            $table = $this->resourceConnection->getTableName('catalog_product_entity_varchar');
+            $select = $conn->select()
+                ->from($table, ['value'])
+                ->where('entity_id = ?', $productId)
+                ->where('attribute_id = ?', $attrId)
+                ->order('store_id DESC')
+                ->limit(1);
+            $val = $conn->fetchOne($select);
+            if (is_string($val) && $val !== '' && $val !== 'no_selection') {
+                return $val;
+            }
+            return null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function getProductDecimalAttribute(int $productId, string $attributeCode): ?float
+    {
+        $attrId = $this->getAttributeId($attributeCode, 'decimal');
+        if (!$attrId || $this->resourceConnection === null) {
+            return null;
+        }
+
+        try {
+            $conn = $this->resourceConnection->getConnection();
+            $table = $this->resourceConnection->getTableName('catalog_product_entity_decimal');
+            $select = $conn->select()
+                ->from($table, ['value'])
+                ->where('entity_id = ?', $productId)
+                ->where('attribute_id = ?', $attrId)
+                ->order('store_id DESC')
+                ->limit(1);
+            $val = $conn->fetchOne($select);
+            if (is_numeric($val)) {
+                return (float) $val;
+            }
+            return null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 
     /**
      * Resolve all configured customer group IDs from repository or fallback.
@@ -721,32 +1044,59 @@ class ProductDataMapper
     }
 
     /**
+     * Resolve stock availability and quantity using MSI StockResolver with legacy fallback.
+     *
      * @param string $sku
      * @param int $productId
+     * @param int $websiteId
      * @return array{0: bool, 1: float}
      */
-    private function resolveStock(string $sku, int $productId): array
+    private function resolveStock(string $sku, int $productId, int $websiteId = 1): array
     {
-        $stockId = 1; // Default MSI Stock
-        if ($this->isSalable && $this->salableQty) {
+        $stockId = 1;
+        if ($this->stockResolver !== null) {
             try {
-                $isAvailable = $this->isSalable->execute($sku, $stockId);
-                $qty = $isAvailable ? (float)$this->salableQty->execute($sku, $stockId) : 0.0;
-                if ($isAvailable && $qty > 0) {
-                    return [(bool)$isAvailable, $qty];
-                }
+                $website = $this->storeManager->getWebsite($websiteId);
+                $websiteCode = (string) $website->getCode();
+                $stock = $this->stockResolver->execute(
+                    SalesChannelInterface::TYPE_WEBSITE,
+                    $websiteCode
+                );
+                $stockId = (int) $stock->getStockId();
             } catch (\Throwable) {
-                // Fallback to legacy stock item below
+                $stockId = 1;
+            }
+        }
+
+        if ($this->isSalable !== null && $this->salableQty !== null) {
+            try {
+                $isAvailable = (bool) $this->isSalable->execute($sku, $stockId);
+                $qty = $isAvailable ? (float) $this->salableQty->execute($sku, $stockId) : 0.0;
+                return [$isAvailable, $qty];
+            } catch (\Magento\Framework\Exception\NoSuchEntityException) {
+                // If product is not linked to this MSI stock, it is out of stock
+                return [false, 0.0];
+            } catch (\Throwable $e) {
+                $this->logger->warning(sprintf(
+                    '[MageCopilot_EdgeSync] MSI stock lookup failed for SKU "%s" on stock ID %d: %s',
+                    $sku,
+                    $stockId,
+                    $e->getMessage()
+                ));
             }
         }
 
         try {
             $stockItem = $this->stockRegistry->getStockItem($productId);
+            $manageStock = (bool) $stockItem->getManageStock();
             $qty = (float) $stockItem->getQty();
-            $isInStock = (bool) $stockItem->getIsInStock() && ($qty > 0 || !$stockItem->getManageStock());
+            $isInStock = (bool) $stockItem->getIsInStock();
+            if ($manageStock) {
+                $isInStock = $isInStock && ($qty > 0);
+            }
             return [$isInStock, $qty];
         } catch (\Throwable) {
-            return [true, 100.0];
+            return [false, 0.0];
         }
     }
 
@@ -800,7 +1150,7 @@ class ProductDataMapper
 
         try {
             $store = $this->storeManager->getStore();
-            $this->mediaBaseUrl = ($store instanceof \Magento\Store\Model\Store)
+            $this->mediaBaseUrl = ($store instanceof Store)
                 ? $store->getBaseUrl(UrlInterface::URL_TYPE_MEDIA)
                 : '/media/';
         } catch (\Throwable) {
@@ -867,8 +1217,8 @@ class ProductDataMapper
                 $ratingVal = $vote ? (float) $vote['value'] : 5.0;
 
                 $reviews[] = [
-                    'nickname' => (string) ($row['nickname'] ?: 'Cliente Verificado'),
-                    'summary' => (string) ($row['title'] ?: 'Excelente producto'),
+                    'nickname' => (string) ($row['nickname'] ?: 'Verified Customer'),
+                    'summary' => (string) ($row['title'] ?: 'Verified Review'),
                     'text' => (string) ($row['detail'] ?: ''),
                     'rating' => $ratingVal,
                     'created_at' => strtotime((string) $row['created_at']) ?: time()

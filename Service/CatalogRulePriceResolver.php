@@ -17,6 +17,11 @@ class CatalogRulePriceResolver
     /** @var array<string, float|null> */
     private array $priceCache = [];
 
+    /**
+     * @param ResourceConnection $resourceConnection
+     * @param TimezoneInterface $timezone
+     * @param LoggerInterface $logger
+     */
     public function __construct(
         private readonly ResourceConnection $resourceConnection,
         private readonly TimezoneInterface $timezone,
@@ -63,12 +68,16 @@ class CatalogRulePriceResolver
 
             $rulePrice = $connection->fetchOne($select);
 
-            $result = ($rulePrice !== false && $rulePrice !== null) ? (float) $rulePrice : null;
+            $result = is_numeric($rulePrice) ? (float) $rulePrice : null;
             return $this->priceCache[$cacheKey] = $result;
         } catch (\Throwable $e) {
             $this->logger->warning(
                 '[MageCopilot_EdgeSync] Failed resolving catalog rule price: ' . $e->getMessage(),
-                ['product_id' => $productId, 'website_id' => $websiteId, 'group_id' => $customerGroupId]
+                [
+                    'product_id' => $productId,
+                    'website_id' => $websiteId,
+                    'group_id' => $customerGroupId
+                ]
             );
             return $this->priceCache[$cacheKey] = null;
         }

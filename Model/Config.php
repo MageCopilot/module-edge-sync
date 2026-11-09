@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace MageCopilot\EdgeSync\Model;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
 
 class Config
@@ -19,8 +20,13 @@ class Config
     private const XML_PATH_EMBEDDING_MODEL = 'magecopilot_edgesync/embedding/model';
     private const XML_PATH_EMBEDDING_DIMENSIONS = 'magecopilot_edgesync/embedding/dimensions';
 
+    /**
+     * @param ScopeConfigInterface $scopeConfig
+     * @param EncryptorInterface $encryptor
+     */
     public function __construct(
-        private ScopeConfigInterface $scopeConfig
+        private ScopeConfigInterface $scopeConfig,
+        private EncryptorInterface $encryptor
     ) {
     }
 
@@ -37,8 +43,21 @@ class Config
 
     public function getApiKey(?int $storeId = null): string
     {
-        $key = (string) $this->scopeConfig->getValue(self::XML_PATH_API_KEY, ScopeInterface::SCOPE_STORE, $storeId);
-        return $key ?: 'magecopilot_local_dev_secret_key';
+        $raw = (string) $this->scopeConfig->getValue(self::XML_PATH_API_KEY, ScopeInterface::SCOPE_STORE, $storeId);
+        if ($raw === '') {
+            return '';
+        }
+
+        try {
+            $decrypted = $this->encryptor->decrypt($raw);
+            if ($decrypted !== '') {
+                return trim((string) $decrypted);
+            }
+        } catch (\Throwable) {
+            // Return plain string if not encrypted
+        }
+
+        return trim($raw);
     }
 
     public function getCollectionName(?int $storeId = null): string
@@ -56,7 +75,7 @@ class Config
     public function isEmbeddingEnabled(?int $storeId = null): bool
     {
         $val = $this->scopeConfig->getValue(self::XML_PATH_EMBEDDING_ENABLED, ScopeInterface::SCOPE_STORE, $storeId);
-        return $val === null ? true : (bool) $val; // Default true for Sprint 10 semantic search
+        return $val === null ? true : (bool) $val;
     }
 
     public function getEmbeddingProvider(?int $storeId = null): string
@@ -67,8 +86,20 @@ class Config
 
     public function getEmbeddingApiKey(?int $storeId = null): string
     {
-        $key = (string) $this->scopeConfig->getValue(self::XML_PATH_EMBEDDING_API_KEY, ScopeInterface::SCOPE_STORE, $storeId);
-        return $key ?: (getenv('OPENAI_API_KEY') ?: (getenv('GEMINI_API_KEY') ?: ''));
+        $raw = (string) $this->scopeConfig->getValue(self::XML_PATH_EMBEDDING_API_KEY, ScopeInterface::SCOPE_STORE, $storeId);
+        if ($raw !== '') {
+            try {
+                $decrypted = $this->encryptor->decrypt($raw);
+                if ($decrypted !== '') {
+                    return trim((string) $decrypted);
+                }
+            } catch (\Throwable) {
+                // Fallback to plain
+            }
+            return trim($raw);
+        }
+
+        return (string) (getenv('OPENAI_API_KEY') ?: (getenv('GEMINI_API_KEY') ?: ''));
     }
 
     public function getEmbeddingModel(?int $storeId = null): string

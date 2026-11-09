@@ -27,7 +27,7 @@ class EmbeddingService
         $parts = [];
 
         if (!empty($productData['name'])) {
-            $parts[] = 'Producto: ' . (string) $productData['name'];
+            $parts[] = 'Product: ' . (string) $productData['name'];
         }
 
         if (!empty($productData['sku'])) {
@@ -35,7 +35,7 @@ class EmbeddingService
         }
 
         if (!empty($productData['category_names']) && is_array($productData['category_names'])) {
-            $parts[] = 'Categorías: ' . implode(', ', array_map('strval', $productData['category_names']));
+            $parts[] = 'Categories: ' . implode(', ', array_map('strval', $productData['category_names']));
         }
 
         if (!empty($productData['brand'])) {

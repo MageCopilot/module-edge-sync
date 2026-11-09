@@ -10,8 +10,20 @@ use Magento\InventorySalesApi\Api\GetProductSalableQtyInterface;
 use Magento\InventorySalesApi\Api\IsProductSalableInterface;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Message Queue Consumer for Asynchronous Stock and Product Edge Synchronization
+ */
 class Consumer
 {
+    /**
+     * @param TypesenseClient $typesenseClient
+     * @param Config $config
+     * @param ProductResource $productResource
+     * @param IsProductSalableInterface|null $isSalable
+     * @param GetProductSalableQtyInterface|null $salableQty
+     * @param LoggerInterface $logger
+     * @param \MageCopilot\EdgeSync\Service\IndexerService|null $indexerService
+     */
     public function __construct(
         private TypesenseClient $typesenseClient,
         private Config $config,
@@ -23,6 +35,12 @@ class Consumer
     ) {
     }
 
+    /**
+     * Process stock update message
+     *
+     * @param string $rawMessage
+     * @return void
+     */
     public function processMessage(string $rawMessage): void
     {
         $this->logger->info('[MageCopilot_EdgeSync] Consumer received message: ' . $rawMessage);
@@ -68,17 +86,30 @@ class Consumer
                 );
 
                 if ($parentId) {
-                    $this->updateParentConfigurableStock(
-                        $collectionName,
-                        (string) $parentId,
-                        (string) $sku,
-                        (string) $productId,
-                        (bool) $isAvailable,
-                        (float) $salableQuantity
-                    );
+                    if ($this->indexerService !== null) {
+                        $this->indexerService->reindexList([(int) $parentId]);
+                        $this->logger->info(sprintf(
+                            '[MageCopilot_EdgeSync] Reindexed parent configurable %s for child variant %s',
+                            $parentId,
+                            $sku
+                        ));
+                    } else {
+                        $this->updateParentConfigurableStock(
+                            $collectionName,
+                            (string) $parentId,
+                            (string) $sku,
+                            (string) $productId,
+                            (bool) $isAvailable,
+                            (float) $salableQuantity
+                        );
+                    }
                 }
             } catch (\Throwable $e) {
-                $this->logger->error(sprintf('[MageCopilot_EdgeSync] Error resolving stock for SKU %s: %s', $sku, $e->getMessage()));
+                $this->logger->error(sprintf(
+                    '[MageCopilot_EdgeSync] Error resolving stock for SKU %s: %s',
+                    $sku,
+                    $e->getMessage()
+                ));
             }
         }
 
@@ -88,17 +119,26 @@ class Consumer
                 $this->logger->info(sprintf(
                     '[MageCopilot_EdgeSync] Typesense stock updated for %d documents (success: %d, failed: %d)',
                     count($documentsToUpdate),
-                    $res['success_count'] ?? 0,
-                    $res['failed_count'] ?? 0
+                    $res['success_count'],
+                    $res['failed_count']
                 ));
             } catch (\Throwable $e) {
                 $this->logger->error('[MageCopilot_EdgeSync] Failed to update Typesense stock: ' . $e->getMessage());
+                throw $e;
             }
         }
     }
 
     /**
      * Propagate child variant stock update directly to parent configurable product document in Typesense.
+     *
+     * @param string $collectionName
+     * @param string $parentId
+     * @param string $childSku
+     * @param string $childId
+     * @param bool $isAvailable
+     * @param float $salableQuantity
+     * @return void
      */
     private function updateParentConfigurableStock(
         string $collectionName,
@@ -149,7 +189,7 @@ class Consumer
 
             $this->typesenseClient->updateDocument($collectionName, $parentId, $updatePayload);
             $this->logger->info(sprintf(
-                '[MageCopilot_EdgeSync] Successfully updated parent configurable ID %s in Typesense for variant %s (in_stock: %s, qty: %.2f)',
+                '[MageCopilot_EdgeSync] Updated parent configurable ID %s for variant %s (in_stock: %s, qty: %.2f)',
                 $parentId,
                 $childSku,
                 $isAvailable ? 'true' : 'false',
@@ -168,24 +208,44 @@ class Consumer
      * Process product delta message for reindexing into Typesense.
      *
      * @param string $rawMessage
+     * @return void
+     * @throws \Throwable
      */
     public function processProductMessage(string $rawMessage): void
     {
-         $this->logger->info('[MageCopilot_EdgeSync] Product consumer received message: ' . $rawMessage);
+        $this->logger->info('[MageCopilot_EdgeSync] Product consumer received message: ' . $rawMessage);
 
-         $payload = json_decode($rawMessage, true);
+        $payload = json_decode($rawMessage, true);
         if (!is_array($payload)) {
             return;
         }
 
-         $ids = $payload['ids'] ?? [];
-         $skus = $payload['skus'] ?? [];
+        $ids = [];
+        if (isset($payload['ids']) && is_array($payload['ids'])) {
+            foreach ($payload['ids'] as $val) {
+                if (is_numeric($val)) {
+                    $ids[] = (int) $val;
+                }
+            }
+        }
+
+        if (isset($payload['parent_ids']) && is_array($payload['parent_ids'])) {
+            foreach ($payload['parent_ids'] as $val) {
+                if (is_numeric($val)) {
+                    $ids[] = (int) $val;
+                }
+            }
+        }
+
+        $skus = isset($payload['skus']) && is_array($payload['skus']) ? $payload['skus'] : [];
 
         if (empty($ids) && !empty($skus)) {
             foreach ($skus as $sku) {
-                $id = $this->productResource->getIdBySku($sku);
-                if ($id) {
-                    $ids[] = (int) $id;
+                if (is_string($sku) && $sku !== '') {
+                    $id = $this->productResource->getIdBySku($sku);
+                    if ($id !== false && $id !== null && $id !== '') {
+                        $ids[] = (int) $id;
+                    }
                 }
             }
         }
@@ -195,16 +255,28 @@ class Consumer
             return;
         }
 
-         $ids = array_values(array_unique(array_map('intval', $ids)));
+        $ids = array_values(array_unique(array_map('intval', $ids)));
         if ($this->indexerService !== null) {
-            $res = $this->indexerService->reindexIds($ids);
-            $this->logger->info(sprintf(
-                '[MageCopilot_EdgeSync] Consumer reindexed %d products (%d failed)',
-                $res['indexed'] ?? 0,
-                $res['failed'] ?? 0
-            ));
+            try {
+                $res = $this->indexerService->reindexList($ids);
+                $this->logger->info(sprintf(
+                    '[MageCopilot_EdgeSync] Consumer processed %d product IDs (indexed: %d, deleted: %d, failed: %d)',
+                    count($ids),
+                    $res['indexed'],
+                    $res['deleted'],
+                    $res['failed']
+                ));
+            } catch (\Throwable $e) {
+                $this->logger->error(sprintf(
+                    '[MageCopilot_EdgeSync] Error in indexerService during consumer delta sync: %s',
+                    $e->getMessage()
+                ));
+                throw $e;
+            }
         } else {
-            $this->logger->warning('[MageCopilot_EdgeSync] IndexerService unavailable in consumer for product delta sync');
+            $this->logger->warning(
+                '[MageCopilot_EdgeSync] IndexerService unavailable in consumer for product delta sync'
+            );
         }
     }
 }

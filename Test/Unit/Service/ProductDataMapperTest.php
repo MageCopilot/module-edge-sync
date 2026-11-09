@@ -238,6 +238,187 @@ class ProductDataMapperTest extends TestCase
         $this->assertIsArray($doc['group_prices']);
     }
 
+    public function testMapResolvesMsiOutOfStockDeterministicallyWithoutFallingThrough(): void
+    {
+        $productStub = new class extends Product {
+            public function __construct()
+            {
+            }
+            public function getId()
+            {
+                return 99;
+            }
+            public function getSku()
+            {
+                return 'OUT-OF-STOCK-SKU';
+            }
+            public function getName()
+            {
+                return 'OOS Product';
+            }
+            public function getPrice()
+            {
+                return 45.00;
+            }
+            public function getSpecialPrice()
+            {
+                return null;
+            }
+            public function getCategoryIds()
+            {
+                return [];
+            }
+            public function getTierPrices()
+            {
+                return [];
+            }
+            public function getDescription()
+            {
+                return '';
+            }
+            public function getShortDescription()
+            {
+                return '';
+            }
+            public function getImage()
+            {
+                return null;
+            }
+            public function getMediaGalleryEntries()
+            {
+                return [];
+            }
+            public function getUrlKey()
+            {
+                return 'oos-product';
+            }
+            public function getCreatedAt()
+            {
+                return '2026-01-01';
+            }
+        };
+
+        // MSI reports product is NOT salable
+        $this->isSalableStub->method('execute')->willReturn(false);
+        $this->salableQtyStub->method('execute')->willReturn(0.0);
+
+        // Even if legacy stock registry says isInStock=true, MSI must take precedence!
+        $legacyStockStub = $this->createStub(StockItemInterface::class);
+        $legacyStockStub->method('getIsInStock')->willReturn(true);
+        $legacyStockStub->method('getQty')->willReturn(999.0);
+        $this->stockRegistryStub->method('getStockItem')->willReturn($legacyStockStub);
+
+        $doc = $this->mapper->map($productStub);
+
+        $this->assertFalse($doc['is_in_stock']);
+        $this->assertSame(0.0, $doc['salable_qty']);
+    }
+
+    public function testMapResolvesMsiStockIdViaStockResolver(): void
+    {
+        $stockResolverMock = $this->createMock(\Magento\InventorySalesApi\Api\StockResolverInterface::class);
+        $stockMock = $this->createMock(\Magento\InventoryApi\Api\Data\StockInterface::class);
+        $stockMock->method('getStockId')->willReturn(3);
+
+        $websiteMock = $this->createMock(\Magento\Store\Api\Data\WebsiteInterface::class);
+        $websiteMock->method('getCode')->willReturn('b2b_website');
+
+        $this->storeManagerStub->method('getWebsite')->willReturn($websiteMock);
+
+        $stockResolverMock->expects($this->once())
+            ->method('execute')
+            ->with('website', 'b2b_website')
+            ->willReturn($stockMock);
+
+        $isSalableMock = $this->createMock(\Magento\InventorySalesApi\Api\IsProductSalableInterface::class);
+        $isSalableMock->expects($this->once())
+            ->method('execute')
+            ->with('STOCK-RESOLVER-SKU', 3)
+            ->willReturn(true);
+
+        $customMapper = new ProductDataMapper(
+            $this->categoryCollectionFactoryStub,
+            $this->stockRegistryStub,
+            $isSalableMock,
+            $this->salableQtyStub,
+            $this->storeManagerStub,
+            $this->loggerStub,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            $stockResolverMock
+        );
+
+        $productStub = new class extends Product {
+            public function __construct()
+            {
+            }
+            public function getId()
+            {
+                return 55;
+            }
+            public function getSku()
+            {
+                return 'STOCK-RESOLVER-SKU';
+            }
+            public function getName()
+            {
+                return 'Stock Resolver Product';
+            }
+            public function getPrice()
+            {
+                return 80.00;
+            }
+            public function getSpecialPrice()
+            {
+                return null;
+            }
+            public function getCategoryIds()
+            {
+                return [];
+            }
+            public function getTierPrices()
+            {
+                return [];
+            }
+            public function getDescription()
+            {
+                return '';
+            }
+            public function getShortDescription()
+            {
+                return '';
+            }
+            public function getImage()
+            {
+                return null;
+            }
+            public function getMediaGalleryEntries()
+            {
+                return [];
+            }
+            public function getUrlKey()
+            {
+                return 'stock-resolver-product';
+            }
+            public function getCreatedAt()
+            {
+                return '2026-01-01';
+            }
+        };
+
+        $this->salableQtyStub->method('execute')->willReturn(25.0);
+
+        $doc = $customMapper->map($productStub);
+
+        $this->assertTrue($doc['is_in_stock']);
+        $this->assertSame(25.0, $doc['salable_qty']);
+    }
+
     public function testMapUsesDynamicCurrencyRatesAndCatalogRulesAndGroupPrices(): void
     {
         $currencyResolverStub = $this->createStub(\MageCopilot\EdgeSync\Service\CurrencyRateResolver::class);

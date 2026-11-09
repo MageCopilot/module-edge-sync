@@ -38,4 +38,16 @@ class TypesenseClientTest extends TestCase
         $exists = $this->client->collectionExists('products');
         $this->assertIsBool($exists);
     }
+
+    public function testDeleteDocumentReturnsBoolean(): void
+    {
+        $deleted = $this->client->deleteDocument('products', '999999');
+        $this->assertIsBool($deleted);
+    }
+
+    public function testDeleteDocumentsByFilterReturnsInt(): void
+    {
+        $count = $this->client->deleteDocumentsByFilter('products', 'id:=non_existent');
+        $this->assertIsInt($count);
+    }
 }

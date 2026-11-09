@@ -52,10 +52,10 @@ class IndexCommand extends Command
         if ($input->getOption(self::OPTION_HEALTH)) {
             $output->writeln('<info>Checking Typesense connection...</info>');
             if ($this->client->isHealthy()) {
-                $output->writeln('<info>✓ Typesense is HEALTHY and connected.</info>');
+                $output->writeln('<info>[OK] Typesense is healthy and connected.</info>');
                 return Command::SUCCESS;
             } else {
-                $output->writeln('<error>✗ Typesense is UNREACHABLE or reported an error.</error>');
+                $output->writeln('<error>[ERROR] Typesense is unreachable or reported an error.</error>');
                 return Command::FAILURE;
             }
         }
@@ -72,7 +72,7 @@ class IndexCommand extends Command
         try {
             $stats = $this->indexerService->reindexAll($recreate, $targetStore);
             $output->writeln(sprintf(
-                '<info>✓ Indexation complete! Total: %d, Indexed: %d, Failed: %d in %s seconds.</info>',
+                '<info>[OK] Indexation complete! Total: %d, Indexed: %d, Failed: %d in %s seconds.</info>',
                 $stats['total'],
                 $stats['indexed'],
                 $stats['failed'],

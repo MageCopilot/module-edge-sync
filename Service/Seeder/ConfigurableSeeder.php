@@ -1,18 +1,39 @@
 <?php
+/**
+ * MageCopilot - AI-Powered Store Operations Platform
+ *
+ * @category  MageCopilot
+ * @package   MageCopilot_EdgeSync
+ * @author    MageCopilot Team
+ * @copyright Copyright (c) 2026 MageCopilot
+ * @license   OSL-3.0
+ */
+
 declare(strict_types=1);
 
 namespace MageCopilot\EdgeSync\Service\Seeder;
 
 use Magento\Catalog\Api\Data\ProductTierPriceInterfaceFactory;
 use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Catalog\Model\Product\Type as ProductType;
 use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ProductFactory;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
+use Magento\Framework\DB\Adapter\AdapterInterface;
 
+/**
+ * Seeder for configurable products with color and size variation matrices
+ */
 class ConfigurableSeeder
 {
+    /**
+     * @param ProductFactory $productFactory
+     * @param ProductRepositoryInterface $productRepository
+     * @param ProductTierPriceInterfaceFactory $tierPriceFactory
+     * @param StockRegistryInterface $stockRegistry
+     */
     public function __construct(
         private ProductFactory $productFactory,
         private ProductRepositoryInterface $productRepository,
@@ -21,13 +42,25 @@ class ConfigurableSeeder
     ) {
     }
 
+    /**
+     * Seed Hoodie Configurable Product with child simple variants
+     *
+     * @param array<string, int> $categories
+     * @param int $colorAttrId
+     * @param array<string, array{id: int, code: string, hex: string}> $colorOptions
+     * @param int $sizeAttrId
+     * @param array<int|string, int> $sizeOptions
+     * @param AdapterInterface $conn
+     * @param callable $log
+     * @return int
+     */
     public function seedHoodieConfigurable(
         array $categories,
         int $colorAttrId,
         array $colorOptions,
         int $sizeAttrId,
         array $sizeOptions,
-        $conn,
+        AdapterInterface $conn,
         callable $log
     ): int {
         $parentSku = 'MC-APEX-HOODIE';
@@ -36,15 +69,15 @@ class ConfigurableSeeder
         $childIds = [];
 
         $colors = [
-            'Negro' => [
+            'Black' => [
                 'img' => 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
                 'code' => 'BLK'
             ],
-            'Azul Marino' => [
+            'Navy Blue' => [
                 'img' => 'https://images.unsplash.com/photo-1578587018452-892bacefd3f2?auto=format&fit=crop&w=800&q=80',
                 'code' => 'NVY'
             ],
-            'Verde Oliva' => [
+            'Olive Green' => [
                 'img' => 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80',
                 'code' => 'OLV'
             ]
@@ -52,11 +85,11 @@ class ConfigurableSeeder
         $sizes = ['S', 'M', 'L', 'XL'];
 
         foreach ($colors as $colorName => $colorData) {
-            $cOpt = $colorOptions[$colorName]['id'];
+            $cOpt = $colorOptions[$colorName]['id'] ?? 0;
             $cCode = $colorData['code'];
 
             foreach ($sizes as $sizeLabel) {
-                $sOpt = $sizeOptions[$sizeLabel];
+                $sOpt = $sizeOptions[$sizeLabel] ?? 0;
                 $variantSku = "MC-APEX-HD-{$cCode}-{$sizeLabel}";
 
                 // Deliberately make Navy XL out of stock for UI verification
@@ -65,6 +98,9 @@ class ConfigurableSeeder
 
                 try {
                     $variant = $this->productRepository->get($variantSku);
+                    if (!$variant instanceof Product) {
+                        $variant = $this->productFactory->create();
+                    }
                 } catch (\Throwable) {
                     $variant = $this->productFactory->create();
                 }
@@ -77,10 +113,10 @@ class ConfigurableSeeder
                 $variant->setVisibility(Visibility::VISIBILITY_NOT_VISIBLE); // Zero search clutter
                 $variant->setPrice($price);
                 $variant->setWeight(0.8);
-                $variant->setTaxClassId(2);
+                $variant->setData('tax_class_id', 2);
                 $variant->setUrlKey(strtolower($variantSku));
                 $variant->setWebsiteIds([1]);
-                $variant->setCategoryIds([$catId]);
+                $variant->setData('category_ids', [$catId]);
                 $variant->setData('color', $cOpt);
                 $variant->setData('size', $sOpt);
 
@@ -107,8 +143,8 @@ class ConfigurableSeeder
                 $stockItem = $this->stockRegistry->getStockItem($variantId);
                 $stockItem->setQty($stock);
                 $stockItem->setIsInStock($stock > 0);
-                $stockItem->setManageStock(1);
-                $stockItem->setUseConfigManageStock(1);
+                $stockItem->setManageStock(true);
+                $stockItem->setUseConfigManageStock(true);
                 $this->stockRegistry->updateStockItemBySku($variantSku, $stockItem);
 
                 $childSkus[] = $variantSku;
@@ -119,6 +155,9 @@ class ConfigurableSeeder
         // Save Parent Configurable Product
         try {
             $parent = $this->productRepository->get($parentSku);
+            if (!$parent instanceof Product) {
+                $parent = $this->productFactory->create();
+            }
         } catch (\Throwable) {
             $parent = $this->productFactory->create();
         }
@@ -131,12 +170,19 @@ class ConfigurableSeeder
         $parent->setVisibility(Visibility::VISIBILITY_BOTH);
         $parent->setPrice(95.00);
         $parent->setWeight(0.8);
-        $parent->setTaxClassId(2);
-        $parent->setDescription('<p>Nuestra sudadera insignia de alto rendimiento con matriz de variantes en color y talla. Confeccionada con fibra térmica transpirable y acabados termosellados de ultra-durabilidad.</p>');
-        $parent->setShortDescription('Sudadera técnica insignia con ajuste ergonómico y aislamiento térmico.');
+        $parent->setData('tax_class_id', 2);
+        $parent->setData(
+            'description',
+            '<p>Our flagship high-performance hoodie with color and size variant matrix. '
+            . 'Crafted with breathable thermal fibers and ultra-durable heat-sealed finishes.</p>'
+        );
+        $parent->setData(
+            'short_description',
+            'Flagship technical hoodie featuring ergonomic fit and thermal insulation.'
+        );
         $parent->setUrlKey('apex-hybrid-performance-hoodie');
         $parent->setWebsiteIds([1]);
-        $parent->setCategoryIds([$catId]);
+        $parent->setData('category_ids', [$catId]);
 
         $savedParent = $this->productRepository->save($parent);
         $parentId = (int) $savedParent->getId();
@@ -145,8 +191,8 @@ class ConfigurableSeeder
         $parentStock = $this->stockRegistry->getStockItem($parentId);
         $parentStock->setQty(100);
         $parentStock->setIsInStock(true);
-        $parentStock->setManageStock(1);
-        $parentStock->setUseConfigManageStock(1);
+        $parentStock->setManageStock(true);
+        $parentStock->setUseConfigManageStock(true);
         $this->stockRegistry->updateStockItemBySku($parentSku, $parentStock);
 
         // Link Super Attributes
@@ -167,17 +213,29 @@ class ConfigurableSeeder
             ");
         }
 
-        $log(" ✓ Producto Configurable '{$parentSku}' creado con " . count($childIds) . " variantes hijas.");
+        $log(" [OK] Configurable product '{$parentSku}' created with " . count($childIds) . " child variants.");
         return 1 + count($childIds);
     }
 
+    /**
+     * Seed Sneakers Configurable Product with child simple variants
+     *
+     * @param array<string, int> $categories
+     * @param int $colorAttrId
+     * @param array<string, array{id: int, code: string, hex: string}> $colorOptions
+     * @param int $sizeAttrId
+     * @param array<int|string, int> $sizeOptions
+     * @param AdapterInterface $conn
+     * @param callable $log
+     * @return int
+     */
     public function seedSneakersConfigurable(
         array $categories,
         int $colorAttrId,
         array $colorOptions,
         int $sizeAttrId,
         array $sizeOptions,
-        $conn,
+        AdapterInterface $conn,
         callable $log
     ): int {
         $parentSku = 'MC-AEROGLIDE-SNK';
@@ -185,38 +243,41 @@ class ConfigurableSeeder
         $childIds = [];
 
         $colors = [
-            'Negro' => ['code' => 'BLK'],
-            'Blanco' => ['code' => 'WHT'],
-            'Rojo Carmesí' => ['code' => 'RED']
+            'Black' => ['code' => 'BLK'],
+            'White' => ['code' => 'WHT'],
+            'Crimson Red' => ['code' => 'RED']
         ];
         $sizes = ['40', '41', '42', '43', '44'];
 
         foreach ($colors as $colorName => $colorData) {
-            $cOpt = $colorOptions[$colorName]['id'];
+            $cOpt = $colorOptions[$colorName]['id'] ?? 0;
             $cCode = $colorData['code'];
 
             foreach ($sizes as $sizeLabel) {
-                $sOpt = $sizeOptions[$sizeLabel];
+                $sOpt = $sizeOptions[$sizeLabel] ?? 0;
                 $variantSku = "MC-AG-SNK-{$cCode}-{$sizeLabel}";
 
                 try {
                     $variant = $this->productRepository->get($variantSku);
+                    if (!$variant instanceof Product) {
+                        $variant = $this->productFactory->create();
+                    }
                 } catch (\Throwable) {
                     $variant = $this->productFactory->create();
                 }
 
                 $variant->setSku($variantSku);
-                $variant->setName("AeroGlide Carbon Running Sneakers ({$colorName}, Talla {$sizeLabel})");
+                $variant->setName("AeroGlide Carbon Running Sneakers ({$colorName}, Size {$sizeLabel})");
                 $variant->setTypeId(ProductType::TYPE_SIMPLE);
                 $variant->setAttributeSetId(4);
                 $variant->setStatus(Status::STATUS_ENABLED);
                 $variant->setVisibility(Visibility::VISIBILITY_NOT_VISIBLE);
                 $variant->setPrice(185.00);
                 $variant->setWeight(0.6);
-                $variant->setTaxClassId(2);
+                $variant->setData('tax_class_id', 2);
                 $variant->setUrlKey(strtolower($variantSku));
                 $variant->setWebsiteIds([1]);
-                $variant->setCategoryIds([$catId]);
+                $variant->setData('category_ids', [$catId]);
                 $variant->setData('color', $cOpt);
                 $variant->setData('size', $sOpt);
 
@@ -235,8 +296,8 @@ class ConfigurableSeeder
                 $stockItem = $this->stockRegistry->getStockItem($variantId);
                 $stockItem->setQty(25);
                 $stockItem->setIsInStock(true);
-                $stockItem->setManageStock(1);
-                $stockItem->setUseConfigManageStock(1);
+                $stockItem->setManageStock(true);
+                $stockItem->setUseConfigManageStock(true);
                 $this->stockRegistry->updateStockItemBySku($variantSku, $stockItem);
 
                 $childIds[] = $variantId;
@@ -245,6 +306,9 @@ class ConfigurableSeeder
 
         try {
             $parent = $this->productRepository->get($parentSku);
+            if (!$parent instanceof Product) {
+                $parent = $this->productFactory->create();
+            }
         } catch (\Throwable) {
             $parent = $this->productFactory->create();
         }
@@ -257,12 +321,19 @@ class ConfigurableSeeder
         $parent->setVisibility(Visibility::VISIBILITY_BOTH);
         $parent->setPrice(185.00);
         $parent->setWeight(0.6);
-        $parent->setTaxClassId(2);
-        $parent->setDescription('<p>Zapatillas de running con placa propulsora de fibra de carbono y espuma de nitrógeno infusionado. Diseñadas para batir récords en media maratón y maratón.</p>');
-        $parent->setShortDescription('Zapatillas de running de carbono con retorno de energía superior al 85%.');
+        $parent->setData('tax_class_id', 2);
+        $parent->setData(
+            'description',
+            '<p>Carbon fiber plate running shoes engineered with nitrogen-infused foam. '
+            . 'Designed to break records in half-marathon and marathon distances.</p>'
+        );
+        $parent->setData(
+            'short_description',
+            'Carbon running sneakers with over 85% energy return rate.'
+        );
         $parent->setUrlKey('aeroglide-carbon-running-sneakers');
         $parent->setWebsiteIds([1]);
-        $parent->setCategoryIds([$catId]);
+        $parent->setData('category_ids', [$catId]);
 
         $savedParent = $this->productRepository->save($parent);
         $parentId = (int) $savedParent->getId();
@@ -270,8 +341,8 @@ class ConfigurableSeeder
         $parentStock = $this->stockRegistry->getStockItem($parentId);
         $parentStock->setQty(75);
         $parentStock->setIsInStock(true);
-        $parentStock->setManageStock(1);
-        $parentStock->setUseConfigManageStock(1);
+        $parentStock->setManageStock(true);
+        $parentStock->setUseConfigManageStock(true);
         $this->stockRegistry->updateStockItemBySku($parentSku, $parentStock);
 
         $conn->query("
@@ -290,11 +361,20 @@ class ConfigurableSeeder
             ");
         }
 
-        $log(" ✓ Producto Configurable '{$parentSku}' creado con " . count($childIds) . " variantes.");
+        $log(" [OK] Configurable product '{$parentSku}' created with " . count($childIds) . " variants.");
         return 1 + count($childIds);
     }
 
-    public function saveIntAttribute($conn, int $productId, int $attributeId, int $value): void
+    /**
+     * Save integer attribute directly in catalog_product_entity_int table
+     *
+     * @param AdapterInterface $conn
+     * @param int $productId
+     * @param int $attributeId
+     * @param int $value
+     * @return void
+     */
+    public function saveIntAttribute(AdapterInterface $conn, int $productId, int $attributeId, int $value): void
     {
         $conn->query("
             INSERT INTO catalog_product_entity_int (attribute_id, store_id, entity_id, value)

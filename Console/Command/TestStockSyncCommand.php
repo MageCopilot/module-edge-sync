@@ -74,7 +74,7 @@ class TestStockSyncCommand extends Command
         if ($publishOnly) {
             $output->writeln('<info>Publishing event to RabbitMQ topic "magecopilot.inventory.stock_update"...</info>');
             $this->publisher->publish($payload);
-            $output->writeln('<info>✓ Event successfully queued in RabbitMQ.</info>');
+            $output->writeln('<info>[OK] Event successfully queued in RabbitMQ.</info>');
             return Command::SUCCESS;
         }
 
@@ -85,7 +85,7 @@ class TestStockSyncCommand extends Command
         } else {
             $output->writeln('<info>Publishing event to RabbitMQ topic "magecopilot.inventory.stock_update"...</info>');
             $this->publisher->publish($payload);
-            $output->writeln('<info>✓ Event published to RabbitMQ. Now processing message with consumer...</info>');
+            $output->writeln('<info>[OK] Event published to RabbitMQ. Now processing message with consumer...</info>');
             $this->consumer->processMessage($encodedMessage);
         }
 
@@ -98,7 +98,7 @@ class TestStockSyncCommand extends Command
         $updatedDoc = $updatedRes['hits'][0]['document'];
 
         $output->writeln(sprintf(
-            '<info>✓ Updated Typesense state -> is_in_stock: %s, salable_qty: %s</info>',
+            '<info>[OK] Updated Typesense state -> is_in_stock: %s, salable_qty: %s</info>',
             $updatedDoc['is_in_stock'] ? 'true' : 'false',
             $updatedDoc['salable_qty']
         ));

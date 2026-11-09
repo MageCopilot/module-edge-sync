@@ -4,24 +4,21 @@ declare(strict_types=1);
 namespace MageCopilot\EdgeSync\Service;
 
 use Magento\Directory\Model\CurrencyFactory;
-use Magento\Store\Model\StoreManagerInterface;
 
 /**
  * Resolves dynamic foreign exchange (FX) rates using Magento's directory currency tables.
  */
 class CurrencyRateResolver
 {
-    private CurrencyFactory $currencyFactory;
-    private StoreManagerInterface $storeManager;
     /** @var array<string, float> */
     private array $rateCache = [];
 
+    /**
+     * @param CurrencyFactory $currencyFactory
+     */
     public function __construct(
-        CurrencyFactory $currencyFactory,
-        StoreManagerInterface $storeManager
+        private CurrencyFactory $currencyFactory
     ) {
-        $this->currencyFactory = $currencyFactory;
-        $this->storeManager = $storeManager;
     }
 
     /**

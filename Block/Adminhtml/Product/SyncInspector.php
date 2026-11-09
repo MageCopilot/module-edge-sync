@@ -24,6 +24,11 @@ use Magento\Framework\Registry;
  */
 class SyncInspector extends Template
 {
+    /**
+     * @param Context $context
+     * @param Registry $coreRegistry
+     * @param array<string, mixed> $data
+     */
     public function __construct(
         Context $context,
         private Registry $coreRegistry,
@@ -32,28 +37,53 @@ class SyncInspector extends Template
         parent::__construct($context, $data);
     }
 
+    /**
+     * Get current product from registry
+     *
+     * @return Product|null
+     */
     public function getProduct(): ?Product
     {
         return $this->coreRegistry->registry('current_product');
     }
 
+    /**
+     * Get current product entity ID
+     *
+     * @return int|null
+     */
     public function getProductId(): ?int
     {
         $product = $this->getProduct();
         return $product ? (int) $product->getId() : null;
     }
 
+    /**
+     * Get current product SKU
+     *
+     * @return string|null
+     */
     public function getProductSku(): ?string
     {
         $product = $this->getProduct();
         return $product ? (string) $product->getSku() : null;
     }
 
+    /**
+     * Get surgical sync backend URL
+     *
+     * @return string
+     */
     public function getSurgicalSyncUrl(): string
     {
         return $this->getUrl('magecopilot_edgesync/product/surgicalSync');
     }
 
+    /**
+     * Get preview token generation URL
+     *
+     * @return string
+     */
     public function getGeneratePreviewTokenUrl(): string
     {
         return $this->getUrl('magecopilot/product/generatePreviewToken');

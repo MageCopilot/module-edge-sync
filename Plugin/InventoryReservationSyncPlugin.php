@@ -50,7 +50,7 @@ class InventoryReservationSyncPlugin
             }
         } catch (\Throwable $e) {
             $this->logger->critical(
-                sprintf('[MageCopilot_EdgeSync] Error publicando evento de stock a RabbitMQ: %s', $e->getMessage())
+                sprintf('[MageCopilot_EdgeSync] Error publishing stock event to RabbitMQ: %s', $e->getMessage())
             );
         }
     }

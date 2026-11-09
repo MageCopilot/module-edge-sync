@@ -77,15 +77,24 @@ class SurgicalSync extends Action implements HttpGetActionInterface, HttpPostAct
             }
 
             // 1. MariaDB (Origin of Truth) Inspection
+            $productModel = $product instanceof \Magento\Catalog\Model\Product ? $product : null;
+            $specialPrice = $productModel && $productModel->getSpecialPrice() !== null
+                ? (float) $productModel->getSpecialPrice()
+                : null;
+            $finalPrice = $productModel ? (float) $productModel->getFinalPrice() : (float) $product->getPrice();
+            $stockStatus = $productModel ? $productModel->getQuantityAndStockStatus() : null;
+            $isInStock = is_array($stockStatus) ? (bool) ($stockStatus['is_in_stock'] ?? true) : true;
+            $stockQty = is_array($stockStatus) ? (float) ($stockStatus['qty'] ?? 0.0) : 0.0;
+
             $mariaDbData = [
                 'sku' => (string) $product->getSku(),
                 'name' => (string) $product->getName(),
                 'price' => (float) $product->getPrice(),
-                'special_price' => $product->getSpecialPrice() !== null ? (float) $product->getSpecialPrice() : null,
-                'final_price' => (float) $product->getFinalPrice(),
+                'special_price' => $specialPrice,
+                'final_price' => $finalPrice,
                 'status' => (int) $product->getStatus() === 1 ? 'Enabled' : 'Disabled',
-                'is_in_stock' => (bool) ($product->getQuantityAndStockStatus()['is_in_stock'] ?? true),
-                'stock_qty' => (float) ($product->getQuantityAndStockStatus()['qty'] ?? 0.0),
+                'is_in_stock' => $isInStock,
+                'stock_qty' => $stockQty,
                 'updated_at' => (string) $product->getUpdatedAt()
             ];
 
@@ -126,7 +135,8 @@ class SurgicalSync extends Action implements HttpGetActionInterface, HttpPostAct
                 (string) ($this->scopeConfig->getValue('magecopilot/storefront/base_url') ?: 'https://store.magecopilot.com'),
                 '/'
             );
-            $productSlug = (string) ($product->getUrlKey() ?: strtolower(preg_replace('/[^a-z0-9]+/i', '-', (string) $product->getSku())));
+            $rawUrlKey = $productModel ? (string) $productModel->getUrlKey() : '';
+            $productSlug = $rawUrlKey !== '' ? $rawUrlKey : strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', (string) $product->getSku()));
             $productUrl = sprintf('%s/p/%s', $storefrontBase, $productSlug);
 
             $cdnData = $this->inspectCloudflareCdn($productUrl, $productId);

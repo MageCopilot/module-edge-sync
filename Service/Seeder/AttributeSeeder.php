@@ -10,7 +10,7 @@ class AttributeSeeder
      *
      * @param \Magento\Framework\DB\Adapter\AdapterInterface $conn
      * @param callable $log
-     * @return array{color: array{id: int, options: array<string, array{id: int, code: string, hex: string}>}, size: array{id: int, options: array<string, int>}}
+     * @return array{color: array{id: int, options: array<string, array{id: int, code: string, hex: string}>}, size: array{id: int, options: array<int|string, int>}}
      */
     public function ensureConfigurableAttributes($conn, callable $log): array
     {
@@ -43,12 +43,12 @@ class AttributeSeeder
                 'attribute_code' => 'size',
                 'backend_type' => 'int',
                 'frontend_input' => 'select',
-                'frontend_label' => 'Talla',
+                'frontend_label' => 'Size',
                 'source_model' => \Magento\Eav\Model\Entity\Attribute\Source\Table::class,
                 'is_required' => 0,
                 'is_user_defined' => 1
             ]);
-            $sizeAttrId = (int) $conn->lastInsertId();
+            $sizeAttrId = (int) $conn->fetchOne('SELECT LAST_INSERT_ID()');
 
             $conn->insert('catalog_eav_attribute', [
                 'attribute_id' => $sizeAttrId,
@@ -75,11 +75,11 @@ class AttributeSeeder
 
         // Seed Color Options & Swatches
         $colorDefs = [
-            'Negro' => ['code' => 'BLK', 'hex' => '#111827'],
-            'Azul Marino' => ['code' => 'NVY', 'hex' => '#1e3a8a'],
-            'Verde Oliva' => ['code' => 'OLV', 'hex' => '#365314'],
-            'Blanco' => ['code' => 'WHT', 'hex' => '#f8fafc'],
-            'Rojo Carmesí' => ['code' => 'RED', 'hex' => '#991b1b']
+            'Black' => ['code' => 'BLK', 'hex' => '#111827'],
+            'Navy Blue' => ['code' => 'NVY', 'hex' => '#1e3a8a'],
+            'Olive Green' => ['code' => 'OLV', 'hex' => '#365314'],
+            'White' => ['code' => 'WHT', 'hex' => '#f8fafc'],
+            'Crimson Red' => ['code' => 'RED', 'hex' => '#991b1b']
         ];
         $colorOptions = [];
 
@@ -93,7 +93,7 @@ class AttributeSeeder
 
             if (!$optId) {
                 $conn->insert('eav_attribute_option', ['attribute_id' => $colorAttrId, 'sort_order' => count($colorOptions) + 1]);
-                $optId = (int) $conn->lastInsertId();
+                $optId = (int) $conn->fetchOne('SELECT LAST_INSERT_ID()');
                 $conn->insert('eav_attribute_option_value', ['option_id' => $optId, 'store_id' => 0, 'value' => $colorName]);
                 $conn->insert('eav_attribute_option_value', ['option_id' => $optId, 'store_id' => 1, 'value' => $colorName]);
             }
@@ -126,15 +126,15 @@ class AttributeSeeder
 
             if (!$optId) {
                 $conn->insert('eav_attribute_option', ['attribute_id' => $sizeAttrId, 'sort_order' => $idx + 1]);
-                $optId = (int) $conn->lastInsertId();
+                $optId = (int) $conn->fetchOne('SELECT LAST_INSERT_ID()');
                 $conn->insert('eav_attribute_option_value', ['option_id' => $optId, 'store_id' => 0, 'value' => $sizeLabel]);
                 $conn->insert('eav_attribute_option_value', ['option_id' => $optId, 'store_id' => 1, 'value' => $sizeLabel]);
             }
 
-            $sizeOptions[$sizeLabel] = $optId;
+            $sizeOptions[(string) $sizeLabel] = $optId;
         }
 
-        $log(' ✓ Super-atributos color y size sincronizados con opciones y swatches.');
+        $log(' [OK] Super-attributes color and size synchronized with options and swatches.');
 
         return [
             'color' => ['id' => $colorAttrId, 'options' => $colorOptions],

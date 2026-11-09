@@ -153,6 +153,57 @@ class TypesenseClient
     }
 
     /**
+     * Delete a single document by ID from a collection.
+     *
+     * @param string $collectionName
+     * @param string $id
+     * @return bool
+     */
+    public function deleteDocument(string $collectionName, string $id): bool
+    {
+        try {
+            $endpoint = sprintf('/collections/%s/documents/%s', urlencode($collectionName), urlencode($id));
+            $response = $this->request('DELETE', $endpoint);
+            return $response['status'] === 200 || $response['status'] === 404;
+        } catch (\Throwable $e) {
+            $this->logger->warning(sprintf(
+                '[MageCopilot_EdgeSync] Failed to delete document %s from collection %s: %s',
+                $id,
+                $collectionName,
+                $e->getMessage()
+            ));
+            return false;
+        }
+    }
+
+    /**
+     * Delete multiple documents by filter_by query.
+     *
+     * @param string $collectionName
+     * @param string $filterBy
+     * @return int Number of deleted documents
+     */
+    public function deleteDocumentsByFilter(string $collectionName, string $filterBy): int
+    {
+        try {
+            $endpoint = sprintf('/collections/%s/documents?filter_by=%s', urlencode($collectionName), urlencode($filterBy));
+            $response = $this->request('DELETE', $endpoint);
+            if ($response['status'] === 200 && isset($response['data']['num_deleted'])) {
+                return (int) $response['data']['num_deleted'];
+            }
+            return 0;
+        } catch (\Throwable $e) {
+            $this->logger->warning(sprintf(
+                '[MageCopilot_EdgeSync] Failed to delete documents by filter "%s" in collection %s: %s',
+                $filterBy,
+                $collectionName,
+                $e->getMessage()
+            ));
+            return 0;
+        }
+    }
+
+    /**
      * Search documents in Typesense.
      *
      * @param string $collectionName
