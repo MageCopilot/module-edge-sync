@@ -45,7 +45,10 @@ class InventoryReservationSyncPlugin
                 $this->publisher->publish([
                     'type' => 'stock_delta_update',
                     'skus' => array_values(array_unique($affectedSkus)),
-                    'timestamp' => time()
+                    'sales_channel_type' => (string) ($salesChannel->getType() ?: SalesChannelInterface::TYPE_WEBSITE),
+                    'sales_channel_code' => (string) ($salesChannel->getCode() ?: 'base'),
+                    'timestamp' => time(),
+                    'updated_at_ms' => (int) round(microtime(true) * 1000)
                 ]);
             }
         } catch (\Throwable $e) {

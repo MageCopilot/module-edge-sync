@@ -87,10 +87,11 @@ bin/magento indexer:reindex typesense_products
 bin/magento indexer:status typesense_products
 ```
 
-Start the queue consumer for background delta synchronization:
+Start the queue consumers for background delta synchronization:
 
 ```bash
-bin/magento queue:consumers:start magecopilot.edgesync.product
+bin/magento queue:consumers:start magecopilot_typesense_product_sync
+bin/magento queue:consumers:start magecopilot_typesense_stock_sync
 ```
 
 ## Testing

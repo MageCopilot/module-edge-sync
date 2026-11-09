@@ -7,7 +7,7 @@
  * @package   MageCopilot_EdgeSync
  * @author    MageCopilot Team
  * @copyright Copyright (c) 2026 MageCopilot
- * @license   Proprietary
+ * @license   OSL-3.0
  */
 
 declare(strict_types=1);

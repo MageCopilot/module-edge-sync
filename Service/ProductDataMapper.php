@@ -280,8 +280,14 @@ class ProductDataMapper
             'color' => $color,
             'size' => $size,
             'brand' => $brand,
-            'created_at' => strtotime((string) $product->getCreatedAt()) ?: time()
+            'created_at' => strtotime((string) $product->getCreatedAt()) ?: time(),
+            'updated_at_ms' => (int) round(microtime(true) * 1000)
         ];
+
+        // Export dynamic price_group_{id} fields for all configured customer groups
+        foreach ($groupPrices as $gId => $gPrice) {
+            $doc["price_group_{$gId}"] = (float) round($gPrice, 2);
+        }
 
         // Format and append tier prices if present
         $rawTierPrices = $product->getTierPrices();

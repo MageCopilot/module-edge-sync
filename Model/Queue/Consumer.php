@@ -6,8 +6,10 @@ namespace MageCopilot\EdgeSync\Model\Queue;
 use MageCopilot\EdgeSync\Model\Client\TypesenseClient;
 use MageCopilot\EdgeSync\Model\Config;
 use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
+use Magento\InventorySalesApi\Api\Data\SalesChannelInterface;
 use Magento\InventorySalesApi\Api\GetProductSalableQtyInterface;
 use Magento\InventorySalesApi\Api\IsProductSalableInterface;
+use Magento\InventorySalesApi\Api\StockResolverInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -23,6 +25,7 @@ class Consumer
      * @param GetProductSalableQtyInterface|null $salableQty
      * @param LoggerInterface $logger
      * @param \MageCopilot\EdgeSync\Service\IndexerService|null $indexerService
+     * @param StockResolverInterface|null $stockResolver
      */
     public function __construct(
         private TypesenseClient $typesenseClient,
@@ -31,7 +34,8 @@ class Consumer
         private ?IsProductSalableInterface $isSalable,
         private ?GetProductSalableQtyInterface $salableQty,
         private LoggerInterface $logger,
-        private ?\MageCopilot\EdgeSync\Service\IndexerService $indexerService = null
+        private ?\MageCopilot\EdgeSync\Service\IndexerService $indexerService = null,
+        private ?StockResolverInterface $stockResolver = null
     ) {
     }
 
@@ -50,7 +54,19 @@ class Consumer
             return;
         }
 
-        $stockId = 1; // Default MSI Stock
+        $stockId = 1;
+        if ($this->stockResolver !== null) {
+            try {
+                $channelType = (string) ($payload['sales_channel_type'] ?? SalesChannelInterface::TYPE_WEBSITE);
+                $channelCode = (string) ($payload['sales_channel_code'] ?? 'base');
+                $stock = $this->stockResolver->execute($channelType, $channelCode);
+                $stockId = (int) $stock->getStockId();
+            } catch (\Throwable) {
+                $stockId = 1;
+            }
+        }
+
+        $updatedAtMs = (int) ($payload['updated_at_ms'] ?? round(microtime(true) * 1000));
         $collectionName = $this->config->getCollectionName();
         $documentsToUpdate = [];
         $connection = $this->productResource->getConnection();
@@ -76,7 +92,8 @@ class Consumer
                     'id' => (string) $productId,
                     'sku' => (string) $sku,
                     'is_in_stock' => (bool) $isAvailable,
-                    'salable_qty' => (float) $salableQuantity
+                    'salable_qty' => (float) $salableQuantity,
+                    'updated_at_ms' => $updatedAtMs
                 ];
 
                 // Check if this SKU is a child variant of a configurable product
@@ -184,7 +201,8 @@ class Consumer
             $updatePayload = [
                 'variants' => $variants,
                 'is_in_stock' => $parentHasStock,
-                'salable_qty' => $parentSalableQty
+                'salable_qty' => $parentSalableQty,
+                'updated_at_ms' => (int) round(microtime(true) * 1000)
             ];
 
             $this->typesenseClient->updateDocument($collectionName, $parentId, $updatePayload);

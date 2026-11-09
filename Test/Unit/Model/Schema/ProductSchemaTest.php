@@ -29,6 +29,8 @@ class ProductSchemaTest extends TestCase
         $this->assertContains('name', $fieldNames);
         $this->assertContains('price', $fieldNames);
         $this->assertContains('price_group_0', $fieldNames);
+        $this->assertContains('price_group_*', $fieldNames);
+        $this->assertContains('updated_at_ms', $fieldNames);
         $this->assertNotContains('price_group_1', $fieldNames);
         $this->assertNotContains('price_group_2', $fieldNames);
         $this->assertNotContains('price_group_3', $fieldNames);
